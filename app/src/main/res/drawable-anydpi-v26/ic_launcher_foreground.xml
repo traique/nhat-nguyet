@@ -6,15 +6,19 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path android:pathData="M36,49.781a13.781,13.781 0 1,0 27.563,0a13.781,13.781 0 1,0 -27.562,0z">
-        <aapt:attr name="android:fillColor"><gradient android:type="linear" android:startX="36" android:startY="36" android:endX="63.563" android:endY="63.563" android:startColor="#FFFFD86E" android:endColor="#FFF28E30"/></aapt:attr>
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="45.647" android:centerY="45.096" android:gradientRadius="22.05"><item android:offset="0" android:color="#FFFFEDB0"/><item android:offset="0.5" android:color="#FFFFCD5E"/><item android:offset="1" android:color="#FFEF8D30"/></gradient>
+        </aapt:attr>
     </path>
     <path android:pathData="M38.129,60.586A18.844,18.844 0 1,0 60.586,38.129A15.891,15.891 0 1,1 38.129,60.586z">
-        <aapt:attr name="android:fillColor"><gradient android:type="linear" android:startX="37.688" android:startY="37.688" android:endX="75.375" android:endY="75.375" android:startColor="#FFFCF7EC" android:endColor="#FFC4CEE4"/></aapt:attr>
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="46.167" android:startY="44.283" android:endX="70.099" android:endY="70.099" android:startColor="#FFFFFFFF" android:endColor="#FFA7B3D3"/>
+        </aapt:attr>
     </path>
     <path
-        android:fillColor="#F0FAF0DE"
-        android:pathData="M70.383,36.422a1.055,1.055 0 1,0 2.109,0a1.055,1.055 0 1,0 -2.109,0z" />
+        android:fillColor="#F2FFF3D9"
+        android:pathData="M73.688,32.484Q74.115,34.729 76.359,35.156Q74.115,35.584 73.688,37.828Q73.26,35.584 71.016,35.156Q73.26,34.729 73.688,32.484z" />
     <path
-        android:fillColor="#F0FAF0DE"
-        android:pathData="M75.586,43.453a0.633,0.633 0 1,0 1.266,0a0.633,0.633 0 1,0 -1.266,0z" />
+        android:fillColor="#F2FFF3D9"
+        android:pathData="M78.891,42.75Q79.116,43.931 80.297,44.156Q79.116,44.381 78.891,45.563Q78.666,44.381 77.484,44.156Q78.666,43.931 78.891,42.75z" />
 </vector>

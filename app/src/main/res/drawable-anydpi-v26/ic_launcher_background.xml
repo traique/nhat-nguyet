@@ -6,6 +6,13 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path android:pathData="M0,0h108v108h-108z">
-        <aapt:attr name="android:fillColor"><gradient android:type="linear" android:startX="54" android:startY="18" android:endX="54" android:endY="90" android:startColor="#FF1E2F58" android:endColor="#FF080E1F"/></aapt:attr>
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="54" android:startY="18" android:endX="54" android:endY="90" android:startColor="#FF1C2B55" android:endColor="#FF060B1A"/>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="44.719" android:centerY="41.906" android:gradientRadius="45" android:startColor="#8C3C5EAC" android:endColor="#003C5EAC"/>
+        </aapt:attr>
     </path>
 </vector>

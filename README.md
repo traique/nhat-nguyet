@@ -42,6 +42,8 @@ Không cần tài khoản, không quảng cáo, không qua máy chủ trung gian
 - **Lịch âm dương chính xác.** Thuật toán Hồ Ngọc Đức theo múi giờ +7: tháng nhuận, can chi ngày tháng năm, tiết khí, ngày và giờ hoàng đạo, ngày lễ, đếm ngược Tết.
 - **Thông tin cập nhật.** Thời tiết theo giờ và 6 ngày, giá vàng, giá xăng dầu, tỷ giá Vietcombank, chứng khoán trong phiên, tin tức RSS. Các trang tự xoay vòng; chạm để sang trang, vuốt ngang để tiến hoặc lùi.
 - **Đồng hồ lật.** Chế độ chỉ đồng hồ với hai thẻ giờ phút cỡ lớn, kèm ngày, âm lịch và thời tiết nếu muốn.
+- **Vuốt để chỉnh độ sáng.** Vuốt lên hoặc xuống trên đồng hồ để tăng giảm độ sáng ngay; mức mới được lưu cho ban ngày hoặc ban đêm tuỳ lúc chỉnh.
+- **Thời tiết theo vị trí.** Gõ tên thành phố hoặc bấm *Dùng vị trí hiện tại* để lấy toạ độ từ GPS/Wi‑Fi của máy.
 - **Ngày và đêm.** Giờ ngày màn hình luôn sáng. Ban đêm chọn giảm sáng, tắt theo thời gian chờ hoặc tắt hẳn; chữ chuyển tông ấm để bớt ánh sáng xanh. Vẫy tay qua cảm biến tiệm cận để bật màn, tự bật lúc sáng, chống lưu ảnh.
 - **Chạy được ngoại tuyến.** Dữ liệu được lưu lại; mất mạng vẫn hiện số liệu gần nhất kèm nhãn "dữ liệu cũ".
 - **Tự cập nhật.** Tải bản mới từ GitHub Releases, kiểm tra SHA-256 và tên gói trước khi cài.
@@ -53,7 +55,7 @@ Không cần tài khoản, không quảng cáo, không qua máy chủ trung gian
 2. Mở tệp để cài. Lần đầu máy sẽ hỏi quyền cài ứng dụng từ nguồn ngoài:
    - Android 4.x đến 7.x: *Cài đặt > Bảo mật > Nguồn không xác định*.
    - Android 8 trở lên: cho phép trình duyệt hoặc trình quản lý tệp *cài ứng dụng không rõ nguồn*.
-3. Mở **Nhật Nguyệt**, đặt máy nằm ngang và cắm sạc. Bấm biểu tượng bánh răng ở góc trên bên phải để vào **Cài đặt** (hoặc giữ lâu vào đồng hồ).
+3. Mở **Nhật Nguyệt**, đặt máy nằm ngang và cắm sạc. Bấm biểu tượng bánh răng ở góc trên bên phải để vào **Cài đặt** (hoặc giữ lâu vào đồng hồ). Vuốt dọc trên đồng hồ để chỉnh độ sáng.
 
 Gợi ý khi dùng làm lịch treo tường:
 
@@ -88,6 +90,7 @@ Có thể ép 2 cột hoặc 3 cột và chỉnh cỡ chữ trong Cài đặt.
 |---|---|---|
 | Tờ lịch, lịch tháng, âm lịch | Tính ngay trên máy | – |
 | Thời tiết | [Open-Meteo](https://open-meteo.com) | 15 phút |
+| Tên nơi theo vị trí hiện tại | [OpenStreetMap Nominatim](https://nominatim.org) | khi bấm *Dùng vị trí hiện tại* |
 | Giá vàng (SJC, nhẫn, DOJI, PNJ, Bảo Tín, thế giới) | vang.today | 10 phút |
 | Giá xăng dầu Petrolimex | giaxanghomnay.com | 1 giờ |
 | Tỷ giá | Vietcombank | 30 phút |
@@ -101,6 +104,7 @@ Có thể ép 2 cột hoặc 3 cột và chỉnh cỡ chữ trong Cài đặt.
 | Quyền | Dùng để |
 |---|---|
 | Internet, trạng thái mạng | Tải dữ liệu từ các nguồn ở trên |
+| Vị trí (tuỳ chọn) | Chỉ khi bấm *Dùng vị trí hiện tại*, để lấy thời tiết đúng nơi |
 | Giữ màn hình sáng, bật màn hình, báo thức chính xác | Giờ ngày luôn sáng, tự bật màn lúc bắt đầu giờ ngày |
 | Khởi động cùng máy | Tự mở bảng lịch sau khi bật máy |
 | Dịch vụ nền và thông báo | Giữ cảm biến tiệm cận để vẫy tay bật màn |
@@ -166,5 +170,6 @@ app/src/main/java/vn/nhatnguyet/
 - [Conscrypt](https://github.com/google/conscrypt): Apache License 2.0.
 - Bộ chứng chỉ gốc `res/raw/cacerts.pem`: từ kho chứng chỉ của Mozilla (MPL 2.0).
 - Dữ liệu thời tiết: [Open-Meteo](https://open-meteo.com) (CC BY 4.0).
+- Tên nơi theo toạ độ: dữ liệu © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL).
 
 <p align="center"><sub>design by LCTA</sub></p>

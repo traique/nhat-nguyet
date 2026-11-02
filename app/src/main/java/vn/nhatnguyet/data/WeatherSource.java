@@ -131,4 +131,21 @@ public final class WeatherSource extends Source {
         String label = best.optString("name", name.trim());
         return new Object[]{label, best.getDouble("latitude"), best.getDouble("longitude")};
     }
+
+    /** Tên thành phố/tỉnh tại toạ độ (OpenStreetMap Nominatim), vd "TP. Hồ Chí Minh". */
+    public static String placeName(double lat, double lon) throws Exception {
+        String url = String.format(Locale.US, "https://nominatim.openstreetmap.org/reverse?format=jsonv2"
+                + "&lat=%.5f&lon=%.5f&zoom=10&accept-language=vi", lat, lon);
+        return placeName(new JSONObject(Http.getText(url)));
+    }
+
+    static String placeName(JSONObject reverse) throws IOException {
+        JSONObject a = reverse.optJSONObject("address");
+        if (a == null) throw new IOException("Không xác định được tên nơi");
+        for (String k : new String[]{"city", "town", "village", "state", "county"}) {
+            String v = a.optString(k).trim();
+            if (v.length() > 0) return v.replaceFirst("^Thành phố ", "TP. ").replaceFirst("^Tỉnh ", "");
+        }
+        throw new IOException("Không xác định được tên nơi");
+    }
 }

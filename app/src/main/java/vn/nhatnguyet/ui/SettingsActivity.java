@@ -1,14 +1,22 @@
 package vn.nhatnguyet.ui;
 
+import android.Manifest;
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.hardware.Sensor;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.text.InputType;
@@ -45,6 +53,7 @@ import vn.nhatnguyet.update.Updater;
 /** Màn Cài đặt dựng bằng code (chạy được trên Android 4.0.3 với giao diện Holo). */
 public class SettingsActivity extends Activity implements Updater.Listener {
     private static final int REQ_ADMIN = 7;
+    private static final int REQ_LOCATION = 8;
     private static final int ACCENT = 0xFF5FD3B0;
 
     private Prefs prefs;
@@ -61,6 +70,9 @@ public class SettingsActivity extends Activity implements Updater.Listener {
     private Slider rotate, fontScale, dayStart, dayEnd, idle, nightBright, dayBright, installHour;
     private final List<CheckBox> pageChecks = new ArrayList<CheckBox>();
     private boolean geocoding;
+    private LocationManager locationManager;
+    private LocationListener locationListener;
+    private Runnable locateTimeout;
     private boolean firstSection = true;
 
     @Override
@@ -78,6 +90,12 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         super.onResume();
         updater.addListener(this);
         refreshStates();
+    }
+
+    @Override
+    protected void onDestroy() {
+        stopLocating();
+        super.onDestroy();
     }
 
     @Override
@@ -128,7 +146,14 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         fp.leftMargin = dp(8);
         placeRow.addView(find, fp);
         root.addView(placeRow, new LinearLayout.LayoutParams(-1, -2));
+        button(root, "Dùng vị trí hiện tại", new Runnable() {
+            @Override
+            public void run() {
+                useCurrentLocation();
+            }
+        });
         placeState = note(root, "");
+        note(root, "Vị trí chỉ dùng để lấy thời tiết; tên nơi tra từ OpenStreetMap.");
 
         section(root, "Trang thông tin");
         note(root, "Các trang xoay vòng bên phải bảng lịch. Chạm để sang trang, vuốt ngang để tiến hoặc lùi.");
@@ -546,6 +571,138 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         WakeService.sync(this);
         Scheduler.schedule(this);
         if (announce) Toast.makeText(this, "Đã lưu", Toast.LENGTH_SHORT).show();
+    }
+
+    // ------------------------------------------------------------------ vị trí hiện tại
+
+    private void useCurrentLocation() {
+        if (Build.VERSION.SDK_INT >= 23
+                && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,
+                    Manifest.permission.ACCESS_FINE_LOCATION}, REQ_LOCATION);
+            return;
+        }
+        locate();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        if (requestCode != REQ_LOCATION) return;
+        for (int r : results) {
+            if (r == PackageManager.PERMISSION_GRANTED) {
+                locate();
+                return;
+            }
+        }
+        placeState.setText("Chưa được phép dùng vị trí. Có thể nhập tên thành phố rồi bấm Tìm.");
+    }
+
+    /** Lấy vị trí gần nhất máy đã biết; nếu cũ quá thì xin một lần mới (tối đa 30 giây). */
+    @SuppressLint("MissingPermission") // đã kiểm tra quyền ở useCurrentLocation()
+    private void locate() {
+        if (locationListener != null) return;
+        LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
+        if (lm == null) {
+            placeState.setText("Máy không hỗ trợ định vị.");
+            return;
+        }
+        try {
+            Location best = null;
+            for (String provider : lm.getProviders(true)) {
+                try {
+                    Location l = lm.getLastKnownLocation(provider);
+                    if (l != null && (best == null || l.getTime() > best.getTime())) best = l;
+                } catch (SecurityException ignored) {
+                    // vd. GPS khi chỉ có quyền vị trí gần đúng
+                }
+            }
+            // Máy treo tường ít di chuyển: vị trí trong vài giờ gần đây là đủ.
+            if (best != null && System.currentTimeMillis() - best.getTime() < 6 * 3_600_000L) {
+                usePlace(best);
+                return;
+            }
+            String provider = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) ? LocationManager.NETWORK_PROVIDER
+                    : lm.isProviderEnabled(LocationManager.GPS_PROVIDER) ? LocationManager.GPS_PROVIDER : null;
+            if (provider == null) {
+                if (best != null) usePlace(best);
+                else placeState.setText("Định vị đang tắt. Hãy bật vị trí (GPS hoặc Wi‑Fi) trong cài đặt của máy rồi thử lại.");
+                return;
+            }
+            final Location fallback = best;
+            locationManager = lm;
+            locationListener = new LocationListener() {
+                @Override
+                public void onLocationChanged(Location l) {
+                    stopLocating();
+                    usePlace(l);
+                }
+
+                @Override
+                public void onStatusChanged(String p, int status, Bundle extras) {
+                }
+
+                @Override
+                public void onProviderEnabled(String p) {
+                }
+
+                @Override
+                public void onProviderDisabled(String p) {
+                }
+            };
+            locateTimeout = new Runnable() {
+                @Override
+                public void run() {
+                    stopLocating();
+                    if (fallback != null) usePlace(fallback);
+                    else placeState.setText("Không lấy được vị trí. Hãy thử lại ở gần cửa sổ, hoặc nhập tên thành phố.");
+                }
+            };
+            lm.requestSingleUpdate(provider, locationListener, Looper.getMainLooper());
+            handler.postDelayed(locateTimeout, 30_000L);
+            placeState.setText("Đang lấy vị trí…");
+        } catch (SecurityException e) {
+            stopLocating();
+            placeState.setText("Chưa được phép dùng vị trí. Có thể nhập tên thành phố rồi bấm Tìm.");
+        }
+    }
+
+    private void stopLocating() {
+        if (locateTimeout != null) handler.removeCallbacks(locateTimeout);
+        if (locationListener != null) locationManager.removeUpdates(locationListener);
+        locateTimeout = null;
+        locationListener = null;
+    }
+
+    /** Lưu toạ độ, tra tên nơi ở luồng nền (không được thì ghi "Vị trí hiện tại"). */
+    private void usePlace(Location loc) {
+        final double lat = loc.getLatitude();
+        final double lon = loc.getLongitude();
+        final Context app = getApplicationContext();
+        geocoding = true;
+        placeState.setText("Đang xác định tên nơi…");
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                String name;
+                try {
+                    name = WeatherSource.placeName(lat, lon);
+                } catch (Exception e) {
+                    name = "Vị trí hiện tại";
+                }
+                new Prefs(app).setPlace(name, lat, lon);
+                DataHub.get(app).settingsChanged();
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        geocoding = false;
+                        if (isFinishing()) return;
+                        place.setText(prefs.placeName());
+                        placeState.setText(placeLabel());
+                        Toast.makeText(SettingsActivity.this, "Đã chọn " + prefs.placeName(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        }).start();
     }
 
     private void geocode(final boolean announce) {

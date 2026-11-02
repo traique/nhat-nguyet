@@ -14,11 +14,13 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
@@ -102,6 +104,10 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
     private FitColumn newsView;
     private int monthShift;
 
+    private BrightnessHud hud;
+    /** Độ sáng (%) đang kéo trên đồng hồ, -1 khi không kéo. */
+    private int liveBrightness = -1;
+
     private long lastInteraction;
     private long lastTouch;
     private boolean resumed;
@@ -146,7 +152,8 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
 
         if (!prefs.raw().getBoolean("hint_shown", false)) {
             prefs.putBool("hint_shown", true);
-            Toast.makeText(this, "Bấm biểu tượng bánh răng ở góc trên bên phải để mở Cài đặt", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Vuốt lên/xuống trên đồng hồ để chỉnh độ sáng. Bánh răng ở góc trên bên phải mở Cài đặt.",
+                    Toast.LENGTH_LONG).show();
         }
     }
 
@@ -345,6 +352,7 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
                 }
             }
         }
+        if (liveBrightness > 0) bright = liveBrightness / 100f;
         Window w = getWindow();
         if (keepOn) w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         else w.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -353,6 +361,60 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             lp.screenBrightness = bright;
             w.setAttributes(lp);
         }
+    }
+
+    /** Vuốt dọc: lên sáng hơn, xuống tối hơn; lưu vào độ sáng ngày hoặc đêm tuỳ lúc đang vuốt. */
+    private View.OnTouchListener brightnessSwipe() {
+        final int slop = ViewConfiguration.get(this).getScaledTouchSlop();
+        return new View.OnTouchListener() {
+            private float startY;
+            private int startPct;
+            private boolean dragging;
+
+            @Override
+            public boolean onTouch(View v, MotionEvent e) {
+                switch (e.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        startY = e.getRawY();
+                        startPct = currentBrightness();
+                        dragging = false;
+                        // View giữ lâu được (mở Cài đặt) tự nhận chuỗi chạm; view thường thì nhận ở đây.
+                        return !v.isLongClickable();
+                    case MotionEvent.ACTION_MOVE:
+                        float dy = e.getRawY() - startY;
+                        if (!dragging && Math.abs(dy) > slop) {
+                            dragging = true;
+                            v.cancelLongPress();
+                        }
+                        if (dragging) {
+                            int pct = Math.round(startPct - dy / (root.getHeight() * 0.7f) * 100f);
+                            liveBrightness = Math.max(1, Math.min(100, pct));
+                            applyScreenPolicy();
+                            hud.show(liveBrightness);
+                        }
+                        return dragging;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        if (!dragging) return false;
+                        dragging = false;
+                        v.setPressed(false);
+                        prefs.putInt(prefs.isNight(Calendar.getInstance()) ? "night_brightness" : "day_brightness", liveBrightness);
+                        liveBrightness = -1;
+                        hud.hideSoon();
+                        return true;
+                    default:
+                        return dragging;
+                }
+            }
+        };
+    }
+
+    private int currentBrightness() {
+        if (prefs.isNight(Calendar.getInstance())) return prefs.nightBrightness();
+        if (prefs.dayBrightness() > 0) return prefs.dayBrightness();
+        // Đang theo độ sáng của máy: bắt đầu kéo từ mức hệ thống (0–255).
+        int sys = Settings.System.getInt(getContentResolver(), Settings.System.SCREEN_BRIGHTNESS, 128);
+        return Math.max(1, Math.min(100, Math.round(sys * 100f / 255f)));
     }
 
     private boolean wantWarm() {
@@ -403,6 +465,8 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         root.removeAllViews();
         content = new FrameLayout(this);
         root.addView(content, new FrameLayout.LayoutParams(-1, -1));
+        hud = new BrightnessHud(this, ui);
+        root.addView(hud, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
         clearViews();
         flipMode = prefs.clockOnly();
         if (flipMode) {
@@ -535,6 +599,9 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
 
         col.addFill(ui.spacer());
         col.add(buildBottomRow(), 0, ui.px(4));
+        View.OnTouchListener swipe = brightnessSwipe();
+        clock.setOnTouchListener(swipe);
+        col.setOnTouchListener(swipe);
         return col;
     }
 
@@ -602,6 +669,7 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
                 return true;
             }
         });
+        col.setOnTouchListener(brightnessSwipe());
         content.addView(col, new FrameLayout.LayoutParams(-1, -1));
 
         float innerW = w - 2f * pad;

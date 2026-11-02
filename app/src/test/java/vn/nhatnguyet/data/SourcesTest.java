@@ -147,6 +147,21 @@ public class SourcesTest {
     }
 
     @Test
+    public void placeNames() throws Exception {
+        assertEquals("TP. Hồ Chí Minh", WeatherSource.placeName(new JSONObject(
+                "{\"address\":{\"suburb\":\"Phường Sài Gòn\",\"city\":\"Thành phố Hồ Chí Minh\",\"country\":\"Việt Nam\"}}")));
+        assertEquals("Đà Lạt", WeatherSource.placeName(new JSONObject(
+                "{\"address\":{\"city\":\"Đà Lạt\",\"state\":\"Tỉnh Lâm Đồng\"}}")));
+        assertEquals("Lâm Đồng", WeatherSource.placeName(new JSONObject("{\"address\":{\"state\":\"Tỉnh Lâm Đồng\"}}")));
+        try {
+            WeatherSource.placeName(new JSONObject("{\"error\":\"Unable to geocode\"}"));
+            assertTrue("phải báo lỗi khi không có địa chỉ", false);
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage().length() > 0);
+        }
+    }
+
+    @Test
     public void foldText() {
         assertEquals("gia vung 1", Html.fold("Giá vùng 1"));
         assertEquals("dau hoa 2-k", Html.fold("Dầu hỏa 2-K"));
