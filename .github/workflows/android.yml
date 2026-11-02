@@ -1,0 +1,154 @@
+name: Android
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Phiên bản phát hành, dạng X.Y.Z (vd 1.0.1). Để trống = chỉ build thử.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Kiểm thử và lint (API 15)
+        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug
+
+      - name: Xác định phiên bản
+        id: ver
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && -n "$INPUT_VERSION" ]]; then
+            V="${INPUT_VERSION#v}"
+            if git ls-remote --exit-code --tags origin "refs/tags/v$V" >/dev/null; then
+              echo "::error::Đã có tag v$V – hãy chọn số phiên bản lớn hơn."
+              exit 1
+            fi
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            V="${GITHUB_REF#refs/tags/v}"
+          else
+            V=""
+          fi
+          if [[ -n "$V" ]]; then
+            if ! [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Phiên bản phải có dạng X.Y.Z (vd 1.2.3), nhận được $V"
+              exit 1
+            fi
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            V="0.0.${GITHUB_RUN_NUMBER}"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "name=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Giải mã keystore
+        if: steps.ver.outputs.release == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Thiếu secret KEYSTORE_BASE64 – xem README, mục Cập nhật OTA."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Build bản debug (nhánh, PR)
+        if: steps.ver.outputs.release != 'true'
+        env:
+          VERSION_NAME: ${{ steps.ver.outputs.name }}
+          UPDATE_REPO: ${{ github.repository }}
+        run: ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Build bản release đã ký
+        if: steps.ver.outputs.release == 'true'
+        env:
+          VERSION_NAME: ${{ steps.ver.outputs.name }}
+          UPDATE_REPO: ${{ github.repository }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Đóng gói APK và update.json
+        id: pack
+        env:
+          V: ${{ steps.ver.outputs.name }}
+          RELEASE: ${{ steps.ver.outputs.release }}
+          REPO: ${{ github.repository }}
+        run: |
+          mkdir -p out
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          if [ "$RELEASE" = "true" ]; then
+            SRC=app/build/outputs/apk/release/app-release.apk
+            APK="NhatNguyet-$V.apk"
+            # Không bao giờ phát hành bản ký bằng khoá debug.
+            if "$BT/apksigner" verify --print-certs "$SRC" | grep -q "CN=Android Debug"; then
+              echo "::error::APK đang ký bằng khoá debug – kiểm tra các secret KEYSTORE_*"
+              exit 1
+            fi
+            "$BT/apksigner" verify --min-sdk-version 15 "$SRC"
+          else
+            SRC=app/build/outputs/apk/debug/app-debug.apk
+            APK="NhatNguyet-$V-debug.apk"
+          fi
+          cp "$SRC" "out/$APK"
+          CODE=$("$BT/aapt" dump badging "out/$APK" | sed -nE "s/.*versionCode='([0-9]+)'.*/\1/p" | head -1)
+          SHA=$(sha256sum "out/$APK" | cut -d' ' -f1)
+          SIZE=$(stat -c %s "out/$APK")
+          NOTES=$(git log -1 --pretty=%s)
+          python3 - "$CODE" "$V" "$REPO" "$APK" "$SHA" "$SIZE" "$NOTES" > out/update.json <<'PY'
+          import json, sys
+          code, v, repo, apk, sha, size, notes = sys.argv[1:8]
+          print(json.dumps({
+              "versionCode": int(code),
+              "versionName": v,
+              "apk": f"https://github.com/{repo}/releases/download/v{v}/{apk}",
+              "sha256": sha,
+              "size": int(size),
+              "minSdk": 15,
+              "notes": notes,
+          }, ensure_ascii=False, indent=2))
+          PY
+          cat out/update.json
+          echo "apk=$APK" >> "$GITHUB_OUTPUT"
+
+      - name: Lưu APK (tải trong tab Actions)
+        uses: actions/upload-artifact@v7
+        with:
+          name: NhatNguyet-${{ steps.ver.outputs.name }}
+          path: out/*
+
+      - name: Tạo GitHub Release (OTA)
+        if: steps.ver.outputs.release == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ steps.ver.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          name: Nhật Nguyệt ${{ steps.ver.outputs.name }}
+          files: |
+            out/${{ steps.pack.outputs.apk }}
+            out/update.json
+          generate_release_notes: true

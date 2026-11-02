@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Nhật Nguyệt</string>
+    <string name="settings">Cài đặt</string>
+    <string name="fgs_subtype">Giữ cảm biến tiệm cận để đánh thức màn hình lịch treo tường</string>
+    <string name="admin_label">Nhật Nguyệt – tắt màn hình ban đêm</string>
+    <string name="admin_desc">Cho phép Nhật Nguyệt tắt màn hình vào giờ đêm. Gỡ quyền này trong Cài đặt của app trước khi gỡ cài đặt.</string>
+</resources>

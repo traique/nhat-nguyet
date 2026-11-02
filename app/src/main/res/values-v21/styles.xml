@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="BoardTheme" parent="@android:style/Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+    </style>
+    <style name="SettingsTheme" parent="@android:style/Theme.Material">
+        <item name="android:colorAccent">#FF5FD3B0</item>
+        <item name="android:colorPrimary">#FF16223F</item>
+        <item name="android:colorPrimaryDark">#FF0A1022</item>
+    </style>
+</resources>
