@@ -54,7 +54,7 @@ Không cần tài khoản, không quảng cáo, không qua máy chủ trung gian
 
 ## Cài đặt
 
-1. Tải tệp `NhatNguyet-x.y.z.apk` mới nhất ở trang [Releases](https://github.com/traique/nhat-nguyet/releases/latest).
+1. Tải tệp `NhatNguyet-x.y.z.apk` mới nhất ở trang [Releases](https://github.com/traique/nhat-nguyet/releases/latest). Có gì mới: xem [CHANGELOG.md](CHANGELOG.md).
 2. Mở tệp để cài. Lần đầu máy sẽ hỏi quyền cài ứng dụng từ nguồn ngoài:
    - Android 4.x đến 7.x: *Cài đặt > Bảo mật > Nguồn không xác định*.
    - Android 8 trở lên: cho phép trình duyệt hoặc trình quản lý tệp *cài ứng dụng không rõ nguồn*.
