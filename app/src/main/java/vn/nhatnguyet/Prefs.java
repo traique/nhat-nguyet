@@ -210,6 +210,11 @@ public final class Prefs {
         return sp.getBoolean("proximity_wake", true);
     }
 
+    /** Che cảm biến tiệm cận khi bảng lịch đang sáng thì tắt màn hình. */
+    public boolean proximitySleep() {
+        return sp.getBoolean("proximity_sleep", true);
+    }
+
     public boolean wakeMorning() {
         return sp.getBoolean("wake_morning", true);
     }

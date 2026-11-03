@@ -105,6 +105,10 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
     private int monthShift;
 
     private BrightnessHud hud;
+    /** Phủ đen giả tắt màn (khi che cảm biến mà chưa có quyền quản trị); máy tự tắt theo thời gian chờ. */
+    private View shade;
+    private boolean blackout;
+    private boolean swallowTouch;
     /** Độ sáng (%) đang kéo trên đồng hồ, -1 khi không kéo. */
     private int liveBrightness = -1;
 
@@ -169,6 +173,12 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
                 touch();
             }
         };
+        WakeService.onCover = new Runnable() {
+            @Override
+            public void run() {
+                sleepScreen();
+            }
+        };
         hub.start();
         try {
             // ACTION_BATTERY_CHANGED là broadcast "dính": nhận ngay giá trị hiện tại.
@@ -196,6 +206,7 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         } catch (Throwable ignored) {
         }
         WakeService.onWave = null;
+        WakeService.onCover = null;
         handler.removeCallbacksAndMessages(null);
         super.onPause();
     }
@@ -225,9 +236,16 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
-        if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) {
+        int action = ev.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            // Đang phủ đen: lần chạm này chỉ để bật lại màn, không bấm vào gì bên dưới.
+            swallowTouch = blackout;
             lastTouch = SystemClock.elapsedRealtime();
             touch();
+        }
+        if (swallowTouch) {
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) swallowTouch = false;
+            return true;
         }
         return super.dispatchTouchEvent(ev);
     }
@@ -324,7 +342,21 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
     private void touch() {
         lastInteraction = SystemClock.elapsedRealtime();
         lockedThisIdle = false;
+        if (blackout) setBlackout(false);
         applyScreenPolicy();
+    }
+
+    /** Che cảm biến khi màn đang sáng: có quyền quản trị thì tắt hẳn, không thì phủ đen rồi để máy tự tắt. */
+    private void sleepScreen() {
+        if (!prefs.proximitySleep() || AdminReceiver.lockNow(this)) return;
+        setBlackout(true);
+        applyScreenPolicy();
+    }
+
+    private void setBlackout(boolean on) {
+        blackout = on;
+        WakeService.blackout = on;
+        if (shade != null) shade.setVisibility(on ? View.VISIBLE : View.GONE);
     }
 
     private void applyScreenPolicy() {
@@ -353,6 +385,10 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             }
         }
         if (liveBrightness > 0) bright = liveBrightness / 100f;
+        if (blackout) {
+            keepOn = false;
+            bright = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_OFF;
+        }
         Window w = getWindow();
         if (keepOn) w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         else w.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -467,6 +503,10 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         root.addView(content, new FrameLayout.LayoutParams(-1, -1));
         hud = new BrightnessHud(this, ui);
         root.addView(hud, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
+        shade = new View(this);
+        shade.setBackgroundColor(Theme.BG);
+        shade.setVisibility(blackout ? View.VISIBLE : View.GONE);
+        root.addView(shade, new FrameLayout.LayoutParams(-1, -1));
         clearViews();
         flipMode = prefs.clockOnly();
         if (flipMode) {

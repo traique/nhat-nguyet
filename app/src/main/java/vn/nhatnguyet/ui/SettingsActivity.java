@@ -64,7 +64,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
     private EditText place, watchlist, feeds;
     private TextView placeState, adminState, updateState, versionText;
     private Button adminButton, installButton;
-    private CheckBox alwaysOn, burnIn, warmNight, proximity, wakeMorning, autoStart, autoUpdate;
+    private CheckBox alwaysOn, burnIn, warmNight, proximity, proximitySleep, wakeMorning, autoStart, autoUpdate;
     private RadioGroup layoutGroup, nightGroup, displayGroup;
     private CheckBox flipInfo;
     private Slider rotate, fontScale, dayStart, dayEnd, idle, nightBright, dayBright, installHour;
@@ -225,7 +225,10 @@ public class SettingsActivity extends Activity implements Updater.Listener {
 
         section(root, "Đánh thức và tự chạy");
         proximity = check(root, "Vẫy tay qua cảm biến tiệm cận để bật màn hình");
+        proximitySleep = check(root, "Che cảm biến khi màn đang sáng để tắt màn hình");
         note(root, sensorInfo());
+        note(root, "Có quyền quản trị thiết bị (mục Ngày và đêm) thì màn tắt ngay; chưa có thì màn tối đen "
+                + "rồi tự tắt theo thời gian chờ của máy. Chạm màn hình hoặc che cảm biến lần nữa để bật lại.");
         wakeMorning = check(root, "Tự bật màn hình lúc bắt đầu giờ ngày");
         autoStart = check(root, "Tự mở bảng lịch khi khởi động máy");
         if (Build.VERSION.SDK_INT >= 23) {
@@ -521,6 +524,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         warmNight.setChecked(prefs.warmNight());
         burnIn.setChecked(prefs.burnInShift());
         proximity.setChecked(prefs.proximityWake());
+        proximitySleep.setChecked(prefs.proximitySleep());
         wakeMorning.setChecked(prefs.wakeMorning());
         autoStart.setChecked(prefs.autoStart());
         autoUpdate.setChecked(prefs.autoUpdate());
@@ -558,6 +562,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         prefs.putBool("warm_night", warmNight.isChecked());
         prefs.putBool("burn_in_shift", burnIn.isChecked());
         prefs.putBool("proximity_wake", proximity.isChecked());
+        prefs.putBool("proximity_sleep", proximitySleep.isChecked());
         prefs.putBool("wake_morning", wakeMorning.isChecked());
         prefs.putBool("auto_start", autoStart.isChecked());
         prefs.putBool("auto_update", autoUpdate.isChecked());

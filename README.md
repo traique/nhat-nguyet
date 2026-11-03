@@ -44,7 +44,7 @@ Không cần tài khoản, không quảng cáo, không qua máy chủ trung gian
 - **Đồng hồ lật.** Chế độ chỉ đồng hồ với hai thẻ giờ phút cỡ lớn, kèm ngày, âm lịch và thời tiết nếu muốn.
 - **Vuốt để chỉnh độ sáng.** Vuốt lên hoặc xuống trên đồng hồ để tăng giảm độ sáng ngay; mức mới được lưu cho ban ngày hoặc ban đêm tuỳ lúc chỉnh.
 - **Thời tiết theo vị trí.** Gõ tên thành phố hoặc bấm *Dùng vị trí hiện tại* để lấy toạ độ từ GPS/Wi‑Fi của máy.
-- **Ngày và đêm.** Giờ ngày màn hình luôn sáng. Ban đêm chọn giảm sáng, tắt theo thời gian chờ hoặc tắt hẳn; chữ chuyển tông ấm để bớt ánh sáng xanh. Vẫy tay qua cảm biến tiệm cận để bật màn, tự bật lúc sáng, chống lưu ảnh.
+- **Ngày và đêm.** Giờ ngày màn hình luôn sáng. Ban đêm chọn giảm sáng, tắt theo thời gian chờ hoặc tắt hẳn; chữ chuyển tông ấm để bớt ánh sáng xanh. Vẫy tay qua cảm biến tiệm cận để bật màn, che cảm biến khi màn đang sáng để tắt; tự bật lúc sáng, chống lưu ảnh.
 - **Chạy được ngoại tuyến.** Dữ liệu được lưu lại; mất mạng vẫn hiện số liệu gần nhất kèm nhãn "dữ liệu cũ".
 - **Tự cập nhật.** Tải bản mới từ GitHub Releases, kiểm tra SHA-256 và tên gói trước khi cài.
 - **Hợp máy cũ.** Android 4.0.3 trở lên, không cần root. Tự nhúng TLS 1.2 và bộ chứng chỉ gốc nên máy đời cũ vẫn kết nối được các trang HTTPS hiện nay.
@@ -110,7 +110,7 @@ Có thể ép 2 cột hoặc 3 cột và chỉnh cỡ chữ trong Cài đặt.
 | Dịch vụ nền và thông báo | Giữ cảm biến tiệm cận để vẫy tay bật màn |
 | Hiện trên ứng dụng khác, bỏ tối ưu pin | Để bảng lịch tự hiện lại trên Android đời mới |
 | Cài gói ứng dụng | Cập nhật bản mới |
-| Quản trị thiết bị (tuỳ chọn) | Tắt hẳn màn hình ban đêm; gỡ quyền này trong Cài đặt trước khi gỡ ứng dụng |
+| Quản trị thiết bị (tuỳ chọn) | Tắt hẳn màn hình ban đêm hoặc khi che cảm biến; gỡ quyền này trong Cài đặt trước khi gỡ ứng dụng |
 
 ## Dành cho nhà phát triển
 

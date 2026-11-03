@@ -6,7 +6,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 
-/** Quyền "Quản trị thiết bị" chỉ dùng để tắt màn hình (lockNow) vào giờ đêm. */
+/** Quyền "Quản trị thiết bị" chỉ dùng để tắt màn hình (lockNow): giờ đêm hoặc khi che cảm biến. */
 public class AdminReceiver extends DeviceAdminReceiver {
 
     public static ComponentName component(Context c) {
@@ -22,7 +22,7 @@ public class AdminReceiver extends DeviceAdminReceiver {
         return new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
                 .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, component(c))
                 .putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                        "Chỉ dùng để tắt màn hình vào giờ đêm. Đưa tay qua cảm biến hoặc bấm nút nguồn để bật lại.");
+                        "Chỉ dùng để tắt màn hình vào giờ đêm hoặc khi che cảm biến. Đưa tay qua cảm biến hoặc bấm nút nguồn để bật lại.");
     }
 
     public static void remove(Context c) {

@@ -27,8 +27,9 @@ import vn.nhatnguyet.R;
 import vn.nhatnguyet.ui.MainActivity;
 
 /**
- * Dịch vụ chạy nền (có thông báo) giữ cảm biến tiệm cận: đưa tay lại gần thì
- * bật màn hình và mở bảng lịch. Cần giữ CPU thức để nhận sự kiện khi màn tắt.
+ * Dịch vụ chạy nền (có thông báo) giữ cảm biến tiệm cận. Màn đang tắt: đưa tay lại gần thì
+ * bật màn hình và mở bảng lịch. Màn đang sáng: che rồi bỏ tay ra thì báo bảng lịch tắt màn.
+ * Cần giữ CPU thức để nhận sự kiện khi màn tắt.
  */
 public class WakeService extends Service implements SensorEventListener {
     private static final String TAG = "WakeService";
@@ -37,21 +38,25 @@ public class WakeService extends Service implements SensorEventListener {
 
     /** MainActivity đăng ký để biết có người vẫy tay khi màn đang sáng. */
     public static volatile Runnable onWave;
+    /** MainActivity đăng ký (chỉ khi đang hiện) để tắt màn khi có người che cảm biến. */
+    public static volatile Runnable onCover;
+    /** MainActivity đang phủ đen chờ máy tự tắt màn (chưa có quyền quản trị): coi như màn tắt. */
+    public static volatile boolean blackout;
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private SensorManager sensors;
     private Sensor proximity;
     private PowerManager power;
     private PowerManager.WakeLock cpuLock;
-    private boolean lastNear;
-    private long lastWakeAt;
+    private Prefs prefs;
+    private final ProximityGesture gesture = new ProximityGesture();
 
     /** Bật/tắt dịch vụ theo cài đặt. */
     public static void sync(Context context) {
         Context app = context.getApplicationContext();
         Prefs prefs = new Prefs(app);
         Intent i = new Intent(app, WakeService.class);
-        boolean want = prefs.proximityWake() && proximitySensor(app) != null;
+        boolean want = (prefs.proximityWake() || prefs.proximitySleep()) && proximitySensor(app) != null;
         try {
             if (want) {
                 if (Build.VERSION.SDK_INT >= 26) app.startForegroundService(i);
@@ -80,6 +85,7 @@ public class WakeService extends Service implements SensorEventListener {
         goForeground();
         sensors = (SensorManager) getSystemService(SENSOR_SERVICE);
         power = (PowerManager) getSystemService(POWER_SERVICE);
+        prefs = new Prefs(this);
         proximity = proximitySensor(this);
         if (proximity == null || sensors == null) {
             stopSelf();
@@ -117,22 +123,28 @@ public class WakeService extends Service implements SensorEventListener {
         if (proximity == null || event.values == null || event.values.length == 0) return;
         float threshold = Math.min(proximity.getMaximumRange(), 5f);
         boolean near = event.values[0] < threshold;
-        if (near && !lastNear) wave();
-        lastNear = near;
+        switch (gesture.onSample(near, SystemClock.elapsedRealtime(), Screen.isOn(power) && !blackout)) {
+            case ProximityGesture.TOUCH:
+                notifyBoard(false);
+                break;
+            case ProximityGesture.WAKE:
+                notifyBoard(false); // gỡ lớp phủ đen nếu có
+                if (!Screen.isOn(power) && prefs.proximityWake()) Screen.wakeAndShow(this);
+                break;
+            case ProximityGesture.SLEEP:
+                notifyBoard(true);
+                break;
+        }
     }
 
-    private void wave() {
-        long now = SystemClock.elapsedRealtime();
-        if (now - lastWakeAt < 1500) return;
-        lastWakeAt = now;
+    private void notifyBoard(final boolean cover) {
         main.post(new Runnable() {
             @Override
             public void run() {
-                Runnable r = onWave;
+                Runnable r = cover ? onCover : onWave;
                 if (r != null) r.run();
             }
         });
-        if (!Screen.isOn(power)) Screen.wakeAndShow(this);
     }
 
     @SuppressLint("WrongConstant")
@@ -150,7 +162,7 @@ public class WakeService extends Service implements SensorEventListener {
         PendingIntent pi = PendingIntent.getActivity(this, 0, open, piFlags);
         b.setSmallIcon(R.drawable.ic_stat)
                 .setContentTitle(getString(R.string.app_name))
-                .setContentText("Đưa tay lại gần cảm biến để bật màn hình")
+                .setContentText("Che cảm biến tiệm cận để bật hoặc tắt màn hình")
                 .setContentIntent(pi)
                 .setOngoing(true);
         Notification n;
