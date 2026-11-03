@@ -49,6 +49,13 @@ public final class Theme {
         RAIN = tint(0xFF7FC4FF);
     }
 
+    private static final int[] AQI = {0xFF5BD18B, 0xFFE9C85B, 0xFFF29A4A, 0xFFF2645A, 0xFFB884F0, 0xFFCF6B6B};
+
+    /** Màu mức chất lượng không khí (0 tốt … 5 nguy hại), theo bảng màu AQI quen thuộc. */
+    public static int aqi(int level) {
+        return tint(AQI[Math.max(0, Math.min(AQI.length - 1, level))]);
+    }
+
     /** Màu ở tông hiện tại: ban đêm giảm kênh xanh lá và xanh dương. */
     public static int tint(int c) {
         if (!warm) return c;

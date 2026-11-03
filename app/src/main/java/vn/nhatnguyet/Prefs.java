@@ -115,6 +115,11 @@ public final class Prefs {
         sp.edit().putString("feeds", v).apply();
     }
 
+    /** Ngày riêng (giỗ, sinh nhật), mỗi dòng một ngày, vd "15/8 âm Giỗ ông nội". */
+    public String personalDaysRaw() {
+        return sp.getString("personal_days", "");
+    }
+
     // ------------------------------------------------------------ màn hình
 
     public boolean alwaysOn() {
@@ -240,6 +245,33 @@ public final class Prefs {
 
     public void setLastUpdateCheck(long t) {
         sp.edit().putLong("last_update_check", t).apply();
+    }
+
+    // ------------------------------------------------------------ khoá cài đặt
+
+    public boolean hasSettingsPin() {
+        return sp.getString("settings_pin", "").length() > 0;
+    }
+
+    public boolean checkSettingsPin(String pin) {
+        return hashPin(pin).equals(sp.getString("settings_pin", ""));
+    }
+
+    /** null = bỏ khoá. Chỉ lưu mã băm, không lưu mã PIN gốc. */
+    public void setSettingsPin(String pin) {
+        if (pin == null) sp.edit().remove("settings_pin").apply();
+        else sp.edit().putString("settings_pin", hashPin(pin)).apply();
+    }
+
+    static String hashPin(String pin) {
+        try {
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(("nhatnguyet:" + pin).getBytes("UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : d) sb.append(String.format(Locale.US, "%02x", b));
+            return sb.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     // ------------------------------------------------------------ tiện ích

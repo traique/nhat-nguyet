@@ -43,9 +43,12 @@ Không cần tài khoản, không quảng cáo, không qua máy chủ trung gian
 - **Thông tin cập nhật.** Thời tiết theo giờ và 6 ngày, giá vàng, giá xăng dầu, tỷ giá Vietcombank, chứng khoán trong phiên, tin tức RSS. Các trang tự xoay vòng; chạm để sang trang, vuốt ngang để tiến hoặc lùi.
 - **Đồng hồ lật.** Chế độ chỉ đồng hồ với hai thẻ giờ phút cỡ lớn, kèm ngày, âm lịch và thời tiết nếu muốn.
 - **Vuốt để chỉnh độ sáng.** Vuốt lên hoặc xuống trên đồng hồ để tăng giảm độ sáng ngay; mức mới được lưu cho ban ngày hoặc ban đêm tuỳ lúc chỉnh.
-- **Thời tiết theo vị trí.** Gõ tên thành phố hoặc bấm *Dùng vị trí hiện tại* để lấy toạ độ từ GPS/Wi‑Fi của máy.
+- **Thời tiết theo vị trí.** Gõ tên thành phố hoặc bấm *Dùng vị trí hiện tại* để lấy toạ độ từ GPS/Wi‑Fi của máy. Kèm chất lượng không khí (AQI, bụi mịn PM2.5, tô màu theo mức) và dòng nhắc "Sắp mưa khoảng 15h" từ dự báo theo giờ.
+- **Ngày giỗ, sinh nhật.** Tự thêm ngày riêng theo âm hoặc dương lịch (vd. `15/8 âm Giỗ ông nội`). Bảng lịch nhắc trước 7 ngày, tờ lịch ghi tên ngày, lịch tháng đánh dấu chấm đỏ; ngày 30 âm rơi vào tháng thiếu thì tính là ngày 29.
+- **Khoá Cài đặt.** Đặt mã PIN để người khác không đổi được cài đặt khi máy treo ở nơi chung.
 - **Ngày và đêm.** Giờ ngày màn hình luôn sáng. Ban đêm chọn giảm sáng, tắt theo thời gian chờ hoặc tắt hẳn; chữ chuyển tông ấm để bớt ánh sáng xanh. Vẫy tay qua cảm biến tiệm cận để bật màn, che cảm biến khi màn đang sáng để tắt; tự bật lúc sáng, chống lưu ảnh.
 - **Chạy được ngoại tuyến.** Dữ liệu được lưu lại; mất mạng vẫn hiện số liệu gần nhất kèm nhãn "dữ liệu cũ".
+- **Canh giờ máy.** So với giờ của các máy chủ dữ liệu; giờ máy lệch từ 2 phút (hay bị về năm cũ khi hết pin) thì dòng trạng thái báo, chạm để mở cài đặt ngày giờ.
 - **Tự cập nhật.** Tải bản mới từ GitHub Releases, kiểm tra SHA-256 và tên gói trước khi cài.
 - **Hợp máy cũ.** Android 4.0.3 trở lên, không cần root. Tự nhúng TLS 1.2 và bộ chứng chỉ gốc nên máy đời cũ vẫn kết nối được các trang HTTPS hiện nay.
 
@@ -89,7 +92,7 @@ Có thể ép 2 cột hoặc 3 cột và chỉnh cỡ chữ trong Cài đặt.
 | Trang | Nguồn | Làm mới |
 |---|---|---|
 | Tờ lịch, lịch tháng, âm lịch | Tính ngay trên máy | – |
-| Thời tiết | [Open-Meteo](https://open-meteo.com) | 15 phút |
+| Thời tiết, chất lượng không khí | [Open-Meteo](https://open-meteo.com) | 15 phút |
 | Tên nơi theo vị trí hiện tại | [OpenStreetMap Nominatim](https://nominatim.org) | khi bấm *Dùng vị trí hiện tại* |
 | Giá vàng (SJC, nhẫn, DOJI, PNJ, Bảo Tín, thế giới) | vang.today | 10 phút |
 | Giá xăng dầu Petrolimex | giaxanghomnay.com | 1 giờ |

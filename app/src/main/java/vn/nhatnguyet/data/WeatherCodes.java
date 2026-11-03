@@ -11,7 +11,19 @@ public final class WeatherCodes {
     public static final int SNOW = 6;
     public static final int STORM = 7;
 
+    /** Mức chất lượng không khí theo thang AQI (Việt Nam và Mỹ cùng ngưỡng). */
+    public static final String[] AQI_LABEL = {"tốt", "trung bình", "kém", "xấu", "rất xấu", "nguy hại"};
+
     private WeatherCodes() {}
+
+    public static int aqiLevel(int aqi) {
+        if (aqi <= 50) return 0;
+        if (aqi <= 100) return 1;
+        if (aqi <= 150) return 2;
+        if (aqi <= 200) return 3;
+        if (aqi <= 300) return 4;
+        return 5;
+    }
 
     public static String text(int code) {
         switch (code) {

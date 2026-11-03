@@ -147,6 +147,7 @@ final class Pages {
         int y = now.get(Calendar.YEAR);
         LunarDate ld = Lunar.solarToLunar(d, m, y);
         Lunar.Holiday hol = Lunar.holidayOn(d, m, ld);
+        Lunar.Holiday own = Lunar.personalOn(d, m, ld);
         boolean red = hol != null || now.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY;
         int solarColor = red ? Theme.LUNAR : Theme.TEXT;
 
@@ -192,10 +193,11 @@ final class Pages {
         FitColumn col = column();
         col.addFill(faces);
 
-        if (hol != null) {
+        if (hol != null || own != null) {
             FitLine h = line(BODY, true);
             h.setCenter(true);
-            h.set(Theme.LUNAR, hol.name);
+            if (own != null && hol != null) h.set(Theme.LUNAR, own.name + " · " + hol.name, own.name);
+            else h.set(Theme.LUNAR, own != null ? own.name : hol.name);
             col.add(h, 1, ui.px(8));
         }
         StringBuilder gio = new StringBuilder();
@@ -332,6 +334,16 @@ final class Pages {
                 int rain = d.optInt("rain");
                 ui.cell(r, rain > 0 ? (nar ? rain + "%" : "mưa " + rain + "%") : "", nar ? 0.8f : 1.0f, true, SMALL, Theme.RAIN, false);
                 col.add(r, 2 + i);
+            }
+            JSONObject air = w.optJSONObject("air");
+            if (air != null) {
+                int aqi = air.optInt("aqi");
+                int level = WeatherCodes.aqiLevel(aqi);
+                String head = "Không khí " + WeatherCodes.AQI_LABEL[level] + " · AQI " + aqi;
+                double pm = air.optDouble("pm25");
+                FitLine al = line(SMALL + 1, false);
+                al.set(Theme.aqi(level), Double.isNaN(pm) ? head : head + " · bụi mịn PM2.5 " + Math.round(pm), head);
+                col.add(al, 19, ui.px(6));
             }
             if (days.length() > 0) {
                 JSONObject today = days.optJSONObject(0);

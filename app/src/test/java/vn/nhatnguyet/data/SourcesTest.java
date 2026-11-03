@@ -147,6 +147,27 @@ public class SourcesTest {
     }
 
     @Test
+    public void airAndRain() throws Exception {
+        JSONObject air = WeatherSource.air(new JSONObject("{\"current\":{\"us_aqi\":73,\"pm2_5\":25.3}}"));
+        assertEquals(73, air.getInt("aqi"));
+        assertEquals(25.3, air.getDouble("pm25"), 0.001);
+        assertEquals(null, WeatherSource.air(new JSONObject("{\"current\":{\"us_aqi\":null}}")));
+        assertEquals("trung bình", WeatherCodes.AQI_LABEL[WeatherCodes.aqiLevel(73)]);
+        assertEquals(0, WeatherCodes.aqiLevel(50));
+        assertEquals(5, WeatherCodes.aqiLevel(420));
+
+        String dry = "{\"now\":{\"code\":2},\"hours\":[{\"h\":\"13\",\"code\":2,\"rain\":10},"
+                + "{\"h\":\"14\",\"code\":3,\"rain\":20},{\"h\":\"15\",\"code\":80,\"rain\":65},{\"h\":\"16\",\"code\":95,\"rain\":90}]}";
+        assertEquals("Sắp mưa khoảng 15h (65%)", WeatherSource.rainSoon(new JSONObject(dry)));
+        String storm = dry.replace("\"code\":80,\"rain\":65", "\"code\":2,\"rain\":30");
+        assertEquals("Sắp có dông khoảng 16h (90%)", WeatherSource.rainSoon(new JSONObject(storm)));
+        String raining = dry.replace("{\"now\":{\"code\":2}", "{\"now\":{\"code\":63}");
+        assertEquals(null, WeatherSource.rainSoon(new JSONObject(raining)));
+        String light = "{\"now\":{\"code\":1},\"hours\":[{\"h\":\"13\",\"code\":1,\"rain\":0},{\"h\":\"14\",\"code\":51,\"rain\":20}]}";
+        assertEquals("mưa phùn khả năng thấp thì chưa báo", null, WeatherSource.rainSoon(new JSONObject(light)));
+    }
+
+    @Test
     public void placeNames() throws Exception {
         assertEquals("TP. Hồ Chí Minh", WeatherSource.placeName(new JSONObject(
                 "{\"address\":{\"suburb\":\"Phường Sài Gòn\",\"city\":\"Thành phố Hồ Chí Minh\",\"country\":\"Việt Nam\"}}")));

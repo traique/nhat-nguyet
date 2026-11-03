@@ -36,6 +36,8 @@ public class MonthView extends View {
     private LunarDate[] lunars = new LunarDate[0];
     private boolean[] holiday = new boolean[0];
     private boolean[] good = new boolean[0];
+    private boolean[] personal = new boolean[0];
+    private boolean anyPersonal;
     private float scale = 1f;
 
     public MonthView(Context context) {
@@ -78,11 +80,15 @@ public class MonthView extends View {
         lunars = new LunarDate[daysInMonth + 1];
         holiday = new boolean[daysInMonth + 1];
         good = new boolean[daysInMonth + 1];
+        personal = new boolean[daysInMonth + 1];
+        anyPersonal = false;
         for (int d = 1; d <= daysInMonth; d++) {
             LunarDate ld = Lunar.solarToLunar(d, month, year);
             lunars[d] = ld;
             holiday[d] = Lunar.holidayOn(d, month, ld) != null;
             good[d] = Lunar.isHoangDao(ld.jd, ld.month);
+            personal[d] = Lunar.personalOn(d, month, ld) != null;
+            anyPersonal |= personal[d];
         }
         invalidate();
     }
@@ -155,10 +161,14 @@ public class MonthView extends View {
             lunar.setColor(isToday ? Theme.TEXT : ld.day == 1 || ld.day == 15 ? Theme.LUNAR : Theme.DIM);
             canvas.drawText(lt, x + cw - pad * 2f, y + ch - pad * 2.2f, lunar);
 
+            float dot = Math.max(2f, Math.min(cw, ch) * 0.055f);
             if (good[d]) {
                 fill.setColor(Theme.AUSPICIOUS);
-                float r = Math.max(2f, Math.min(cw, ch) * 0.055f);
-                canvas.drawCircle(x + pad * 2.2f + r, y + pad * 2.2f + r, r, fill);
+                canvas.drawCircle(x + pad * 2.2f + dot, y + pad * 2.2f + dot, dot, fill);
+            }
+            if (personal[d]) {
+                fill.setColor(Theme.LUNAR);
+                canvas.drawCircle(x + pad * 2.2f + dot, y + ch - pad * 2.2f - dot, dot * 1.2f, fill);
             }
         }
 
@@ -177,6 +187,14 @@ public class MonthView extends View {
             String b = "số nhỏ: ngày âm lịch";
             canvas.drawText(a, x, base, note);
             x += note.measureText(a) + noteSize * 1.6f;
+            String own = "ngày riêng";
+            if (anyPersonal && x + r * 2 + noteSize * 0.45f + note.measureText(own) <= w - pad) {
+                fill.setColor(Theme.LUNAR);
+                canvas.drawCircle(x + r, ly, r * 1.2f, fill);
+                x += r * 2 + noteSize * 0.45f;
+                canvas.drawText(own, x, base, note);
+                x += note.measureText(own) + noteSize * 1.6f;
+            }
             if (x + note.measureText(b) <= w - pad) canvas.drawText(b, x, base, note);
         }
     }

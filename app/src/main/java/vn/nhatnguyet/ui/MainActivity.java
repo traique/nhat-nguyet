@@ -2,6 +2,8 @@ package vn.nhatnguyet.ui;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -14,6 +16,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.SystemClock;
+import android.text.InputType;
 import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.GestureDetector;
@@ -23,6 +26,8 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -43,8 +48,10 @@ import vn.nhatnguyet.Theme;
 import vn.nhatnguyet.data.DataHub;
 import vn.nhatnguyet.data.Source;
 import vn.nhatnguyet.data.WeatherCodes;
+import vn.nhatnguyet.data.WeatherSource;
 import vn.nhatnguyet.lunar.Lunar;
 import vn.nhatnguyet.lunar.LunarDate;
+import vn.nhatnguyet.net.ClockCheck;
 import vn.nhatnguyet.sys.AdminReceiver;
 import vn.nhatnguyet.sys.Scheduler;
 import vn.nhatnguyet.sys.WakeService;
@@ -60,6 +67,8 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
     private static final long POLICY_MS = 15_000L;
     private static final long SHIFT_MS = 120_000L;
     private static final String[] DATA_KEYS = {"weather", "gold", "fuel", "fx", "stocks", "news"};
+    /** 01/01/2026: giờ máy trước mốc này chắc chắn sai (máy cũ hết pin hay về năm 2012). */
+    private static final long MIN_SANE_TIME = 1767225600000L;
 
     private Prefs prefs;
     private DataHub hub;
@@ -74,7 +83,8 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
     private boolean narrowRight;
 
     private TextView clock, tempText;
-    private FitLine dateLine, lunarLine, canChiLine, eventLine, descText, detailText, statusText;
+    private FitLine dateLine, lunarLine, canChiLine, eventLine, descText, detailText, alertLine, airLine, statusText;
+    private boolean clockWrong;
     private WeatherIcon nowIcon;
     private BatteryView battView;
     private boolean flipMode;
@@ -266,7 +276,44 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
     }
 
     private void openSettings() {
-        startActivity(new Intent(this, SettingsActivity.class));
+        if (!prefs.hasSettingsPin()) {
+            startActivity(new Intent(this, SettingsActivity.class));
+            return;
+        }
+        final EditText pin = new EditText(this);
+        pin.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        pin.setImeOptions(EditorInfo.IME_ACTION_DONE);
+        pin.setHint("Mã PIN");
+        FrameLayout box = new FrameLayout(this);
+        int pad = Math.round(20 * getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad / 2, pad, 0);
+        box.addView(pin);
+        final AlertDialog dialog = new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+                .setTitle("Cài đặt đang khoá")
+                .setView(box)
+                .setPositiveButton("Mở", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        unlockSettings(pin.getText().toString());
+                    }
+                })
+                .setNegativeButton("Huỷ", null)
+                .create();
+        pin.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, android.view.KeyEvent event) {
+                dialog.dismiss();
+                unlockSettings(pin.getText().toString());
+                return true;
+            }
+        });
+        dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+        dialog.show();
+    }
+
+    private void unlockSettings(String pin) {
+        if (prefs.checkSettingsPin(pin)) startActivity(new Intent(this, SettingsActivity.class));
+        else Toast.makeText(this, "Sai mã PIN", Toast.LENGTH_SHORT).show();
     }
 
     // ------------------------------------------------------------------ hẹn giờ
@@ -616,7 +663,7 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         lunarLine = line(18, true);
         col.add(lunarLine, 1, ui.px(6));
         canChiLine = line(14, false);
-        col.add(canChiLine, 6, ui.px(4));
+        col.add(canChiLine, 7, ui.px(4));
         eventLine = line(14.5f, false);
         col.add(eventLine, 3, ui.px(4));
 
@@ -630,12 +677,18 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         wx.addView(descText, Ui.weight(1));
         col.add(wx, 2, ui.px(10));
 
+        alertLine = line(14, true);
+        alertLine.setVisibility(View.GONE);
+        col.add(alertLine, 3, ui.px(4));
         detailText = line(13.5f, false);
-        col.add(detailText, 4, ui.px(4));
+        col.add(detailText, 5, ui.px(4));
+        airLine = line(13.5f, false);
+        airLine.setVisibility(View.GONE);
+        col.add(airLine, 4, ui.px(3));
 
         hoursRow = ui.row();
         hoursCount = (int) clamp(widthPx / ui.pxf(78), 2, 6);
-        col.add(hoursRow, 5, ui.px(6));
+        col.add(hoursRow, 6, ui.px(6));
 
         col.addFill(ui.spacer());
         col.add(buildBottomRow(), 0, ui.px(4));
@@ -671,7 +724,7 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
 
     private void clearViews() {
         clock = tempText = null;
-        dateLine = lunarLine = canChiLine = eventLine = descText = detailText = statusText = null;
+        dateLine = lunarLine = canChiLine = eventLine = descText = detailText = alertLine = airLine = statusText = null;
         nowIcon = null;
         hoursRow = null;
         midMonth = null;
@@ -779,7 +832,7 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             flipDate.setText(Fmt.WEEKDAYS[now.get(Calendar.DAY_OF_WEEK)] + ", "
                     + (flipNarrow ? Fmt.ddmm(now) : Fmt.ddmmyyyy(now)));
             LunarDate ld = Lunar.solarToLunar(now.get(Calendar.DAY_OF_MONTH), now.get(Calendar.MONTH) + 1, now.get(Calendar.YEAR));
-            Lunar.Holiday hol = Lunar.holidayOn(now.get(Calendar.DAY_OF_MONTH), now.get(Calendar.MONTH) + 1, ld);
+            Lunar.Holiday hol = Lunar.eventOn(now.get(Calendar.DAY_OF_MONTH), now.get(Calendar.MONTH) + 1, ld);
             String lunar = "Âm lịch " + ld.day + "/" + ld.month + (ld.leap ? " nhuận" : "") + " " + Lunar.yearCanChi(ld.year);
             if (hol != null) lunar += " · " + hol.name;
             flipLunar.setText(lunar);
@@ -802,7 +855,10 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         flipIcon.setVisibility(View.VISIBLE);
         flipIcon.set(code, now.optInt("day", 1) == 1, Theme.BG);
         flipTemp.setText(Fmt.temp(now.optDouble("t")));
-        flipDesc.setText(WeatherCodes.text(code)); // tên thành phố đã có ở dòng trạng thái
+        // Tên thành phố đã có ở dòng trạng thái; thêm báo sắp mưa nếu có.
+        String rain = WeatherSource.rainSoon(w);
+        flipDesc.setText(rain == null ? WeatherCodes.text(code)
+                : WeatherCodes.text(code) + " · " + rain.replaceFirst(" \\(.*\\)$", "").toLowerCase(new java.util.Locale("vi")));
     }
 
     // ------------------------------------------------------------------ pin
@@ -993,11 +1049,15 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         String day = "Ngày " + Lunar.dayCanChi(ld.jd);
         canChiLine.set(Theme.DIM, day + " · tháng " + Lunar.monthCanChi(ld.month, ld.year), day);
 
-        Lunar.Holiday hol = Lunar.holidayOn(d, m, ld);
+        Lunar.Holiday hol = Lunar.eventOn(d, m, ld);
+        // Ngày riêng (giỗ, sinh nhật) được nhắc trước một tuần, trước cả mùng 1, rằm.
+        Lunar.Upcoming soon = hol == null ? Lunar.nextPersonal(d, m, y, 7) : null;
         String[] ev;
         int color = Theme.LUNAR;
         if (hol != null) {
             ev = new String[]{"Hôm nay: " + hol.name, hol.name};
+        } else if (soon != null) {
+            ev = new String[]{(soon.days == 1 ? "Ngày mai: " : "Còn " + soon.days + " ngày: ") + soon.holiday.name, soon.holiday.name};
         } else if (ld.day == 1 && !ld.leap) {
             ev = new String[]{"Mùng 1 tháng " + Lunar.MONTH_NAME[ld.month]};
         } else if (ld.day == 15) {
@@ -1040,6 +1100,8 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             if (e != null && e.error != null) descText.set(Theme.WARN, "Lỗi: " + e.error, "Lỗi tải");
             else descText.set(Theme.DIM, "Đang tải thời tiết…", "Đang tải…");
             detailText.set(Theme.DIM, prefs.placeName());
+            alertLine.setVisibility(View.GONE);
+            airLine.setVisibility(View.GONE);
             return;
         }
         JSONObject now = w.optJSONObject("now");
@@ -1063,6 +1125,23 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         String humid = Double.isNaN(hum) ? "" : " · ẩm " + Math.round(hum) + "%";
         String head = range.length() > 0 ? range + " · " : "";
         detailText.set(Theme.DIM, head + feels + humid, head + feels, range.length() > 0 ? range : feels);
+
+        String rain = WeatherSource.rainSoon(w);
+        alertLine.setVisibility(rain == null ? View.GONE : View.VISIBLE);
+        if (rain != null) {
+            alertLine.set(rain.startsWith("Sắp có dông") ? Theme.WARN : Theme.RAIN, rain, rain.replaceFirst(" \\(.*\\)$", ""));
+        }
+        JSONObject air = w.optJSONObject("air");
+        airLine.setVisibility(air == null ? View.GONE : View.VISIBLE);
+        if (air != null) {
+            int aqi = air.optInt("aqi");
+            int level = WeatherCodes.aqiLevel(aqi);
+            String label = WeatherCodes.AQI_LABEL[level];
+            double pm = air.optDouble("pm25");
+            String airHead = "Không khí " + label + " · AQI " + aqi;
+            airLine.set(Theme.aqi(level), Double.isNaN(pm) ? airHead : airHead + " · PM2.5 " + Math.round(pm), airHead,
+                    "AQI " + aqi + " · " + label);
+        }
 
         JSONArray hours = w.optJSONArray("hours");
         if (hours != null) {
@@ -1091,6 +1170,21 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             statusText.set(Theme.DIM, updater.message());
             return;
         }
+        // Giờ máy sai làm đồng hồ sai và hỏng cả kết nối HTTPS, nên báo trước các lỗi tải.
+        long off = ClockCheck.offsetMs();
+        boolean ancient = System.currentTimeMillis() < MIN_SANE_TIME;
+        clockWrong = ancient || Math.abs(off) >= 2 * 60_000L;
+        if (clockWrong) {
+            String what;
+            if (ancient) {
+                what = "Giờ máy sai (năm " + Calendar.getInstance().get(Calendar.YEAR) + ")";
+            } else {
+                long min = Math.round(Math.abs(off) / 60_000.0);
+                what = "Giờ máy " + (off > 0 ? "chậm " : "nhanh ") + (min >= 90 ? Math.round(min / 60.0) + " giờ" : min + " phút");
+            }
+            statusText.set(Theme.WARN, what + " · chạm để chỉnh", what);
+            return;
+        }
         StringBuilder err = new StringBuilder();
         for (String k : DATA_KEYS) {
             Source s = hub.source(k);
@@ -1117,6 +1211,12 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
     private void onStatusClick() {
         if (updater.ready()) {
             updater.install(this);
+        } else if (clockWrong) {
+            try {
+                startActivity(new Intent(Settings.ACTION_DATE_SETTINGS));
+            } catch (Throwable t) {
+                Toast.makeText(this, "Mở Cài đặt của máy > Ngày và giờ, bật Tự động", Toast.LENGTH_LONG).show();
+            }
         } else {
             hub.refreshAll();
             Toast.makeText(this, "Đang tải lại dữ liệu…", Toast.LENGTH_SHORT).show();

@@ -42,8 +42,49 @@ public final class WeatherSource extends Source {
                 + "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,is_day"
                 + "&hourly=temperature_2m,weather_code,precipitation_probability,is_day"
                 + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset";
-        JSONObject r = new JSONObject(Http.getText(url));
-        return normalize(r, prefs.placeName());
+        JSONObject out = normalize(new JSONObject(Http.getText(url)), prefs.placeName());
+        // Chất lượng không khí chỉ là phần thêm: lỗi thì vẫn hiện thời tiết.
+        try {
+            String aq = "https://air-quality-api.open-meteo.com/v1/air-quality"
+                    + String.format(Locale.US, "?latitude=%.4f&longitude=%.4f", prefs.placeLat(), prefs.placeLon())
+                    + "&current=us_aqi,pm2_5&timezone=Asia%2FHo_Chi_Minh";
+            JSONObject air = air(new JSONObject(Http.getText(aq)));
+            if (air != null) out.put("air", air);
+        } catch (Exception ignored) {
+        }
+        return out;
+    }
+
+    /** {aqi, pm25} từ Open-Meteo Air Quality; null nếu thiếu số liệu. */
+    static JSONObject air(JSONObject r) throws Exception {
+        JSONObject c = r.optJSONObject("current");
+        if (c == null || c.isNull("us_aqi")) return null;
+        JSONObject o = new JSONObject();
+        o.put("aqi", c.optInt("us_aqi"));
+        J.num(o, "pm25", c.optDouble("pm2_5"));
+        return o;
+    }
+
+    /** "Sắp mưa khoảng 15h (80%)" nếu 3 giờ tới có mưa mà lúc này chưa mưa; null nếu không. */
+    public static String rainSoon(JSONObject w) {
+        JSONObject now = w.optJSONObject("now");
+        JSONArray hours = w.optJSONArray("hours");
+        if (now == null || hours == null || wet(now.optInt("code"))) return null;
+        for (int i = 1; i <= 3 && i < hours.length(); i++) {
+            JSONObject h = hours.optJSONObject(i);
+            int code = h.optInt("code");
+            int rain = h.optInt("rain");
+            if ((wet(code) && rain >= 40) || rain >= 70) {
+                String what = WeatherCodes.kind(code) == WeatherCodes.STORM ? "Sắp có dông" : "Sắp mưa";
+                return what + " khoảng " + h.optString("h").replaceFirst("^0(?=\\d)", "") + "h (" + rain + "%)";
+            }
+        }
+        return null;
+    }
+
+    private static boolean wet(int code) {
+        int k = WeatherCodes.kind(code);
+        return k == WeatherCodes.DRIZZLE || k == WeatherCodes.RAIN || k == WeatherCodes.STORM;
     }
 
     static JSONObject normalize(JSONObject r, String place) throws Exception {

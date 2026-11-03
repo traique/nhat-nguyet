@@ -1,6 +1,7 @@
 package vn.nhatnguyet.lunar;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -31,22 +32,41 @@ public final class Lunar {
     public static final String[] MONTH_NAME = {
             "", "Giêng", "Hai", "Ba", "Tư", "Năm", "Sáu", "Bảy", "Tám", "Chín", "Mười", "Một", "Chạp"};
 
-    /** Ngày lễ: lunar=true thì ngày/tháng là âm lịch. */
+    /** Ngày lễ: lunar=true thì ngày/tháng là âm lịch; personal=true là ngày riêng (giỗ, sinh nhật). */
     public static final class Holiday {
         public final String name;
         public final boolean lunar;
         public final int day;
         public final int month;
         public final boolean major;
+        public final boolean personal;
 
         Holiday(String name, boolean lunar, int day, int month, boolean major) {
+            this(name, lunar, day, month, major, false);
+        }
+
+        private Holiday(String name, boolean lunar, int day, int month, boolean major, boolean personal) {
             this.name = name;
             this.lunar = lunar;
             this.day = day;
             this.month = month;
             this.major = major;
+            this.personal = personal;
+        }
+
+        public static Holiday personal(String name, boolean lunar, int day, int month) {
+            return new Holiday(name, lunar, day, month, true, true);
+        }
+
+        /** Ngày âm không tính tháng nhuận; ngày 30 âm rơi vào tháng thiếu thì tính là ngày 29. */
+        public boolean on(int dd, int mm, LunarDate ld) {
+            if (!lunar) return day == dd && month == mm;
+            if (ld.leap || ld.month != month) return false;
+            return ld.day == day || (day == 30 && ld.day == 29 && lunarMonthLength(ld) == 29);
         }
     }
+
+    private static volatile List<Holiday> personalDays = Collections.emptyList();
 
     public static final Holiday[] HOLIDAYS = {
             new Holiday("Tết Dương lịch", false, 1, 1, true),
@@ -300,15 +320,25 @@ public final class Lunar {
 
     // ---------------------------------------------------------------- ngày lễ
 
+    /** Thay danh sách ngày riêng người dùng nhập (giỗ, sinh nhật). */
+    public static void setPersonal(List<Holiday> days) {
+        personalDays = new ArrayList<Holiday>(days);
+    }
+
     public static Holiday holidayOn(int dd, int mm, LunarDate ld) {
-        for (Holiday h : HOLIDAYS) {
-            if (h.lunar) {
-                if (!ld.leap && ld.day == h.day && ld.month == h.month) return h;
-            } else if (h.day == dd && h.month == mm) {
-                return h;
-            }
-        }
+        for (Holiday h : HOLIDAYS) if (h.on(dd, mm, ld)) return h;
         return null;
+    }
+
+    public static Holiday personalOn(int dd, int mm, LunarDate ld) {
+        for (Holiday h : personalDays) if (h.on(dd, mm, ld)) return h;
+        return null;
+    }
+
+    /** Sự kiện của ngày: ngày riêng trước, sau đó ngày lễ. */
+    public static Holiday eventOn(int dd, int mm, LunarDate ld) {
+        Holiday h = personalOn(dd, mm, ld);
+        return h != null ? h : holidayOn(dd, mm, ld);
     }
 
     public static final class Upcoming {
@@ -330,10 +360,32 @@ public final class Lunar {
         for (int i = 1; i <= 400 && out.size() < count; i++) {
             int[] s = jdToDate(jd0 + i);
             LunarDate ld = solarToLunar(s[0], s[1], s[2]);
-            Holiday h = holidayOn(s[0], s[1], ld);
+            Holiday h = eventOn(s[0], s[1], ld);
             if (h != null && (!majorOnly || h.major)) out.add(new Upcoming(h, i, s));
         }
         return out;
+    }
+
+    /** Ngày riêng gần nhất trong withinDays ngày tới (không gồm hôm nay), hoặc null. */
+    public static Upcoming nextPersonal(int dd, int mm, int yy, int withinDays) {
+        if (personalDays.isEmpty()) return null;
+        int jd0 = jdFromDate(dd, mm, yy);
+        for (int i = 1; i <= withinDays; i++) {
+            int[] s = jdToDate(jd0 + i);
+            Holiday h = personalOn(s[0], s[1], solarToLunar(s[0], s[1], s[2]));
+            if (h != null) return new Upcoming(h, i, s);
+        }
+        return null;
+    }
+
+    /** Lần tới (tính cả hôm nay) của một ngày, trong vòng 400 ngày; null nếu không có. */
+    public static Upcoming next(Holiday h, int dd, int mm, int yy) {
+        int jd0 = jdFromDate(dd, mm, yy);
+        for (int i = 0; i <= 400; i++) {
+            int[] s = jdToDate(jd0 + i);
+            if (h.on(s[0], s[1], solarToLunar(s[0], s[1], s[2]))) return new Upcoming(h, i, s);
+        }
+        return null;
     }
 
     /** Số ngày tới mùng 1 Tết âm lịch kế tiếp (0 nếu hôm nay là mùng 1 Tết). */

@@ -107,6 +107,7 @@ public final class Http {
     private static HttpURLConnection open(String method, String url, byte[] body) throws IOException {
         String current = url;
         for (int hop = 0; hop <= MAX_REDIRECTS; hop++) {
+            long sentAt = System.currentTimeMillis();
             URL u = new URL(current);
             HttpURLConnection c = (HttpURLConnection) u.openConnection();
             if (c instanceof HttpsURLConnection) {
@@ -153,6 +154,11 @@ public final class Http {
             if (code < 200 || code >= 300) {
                 c.disconnect();
                 throw new HttpStatusException(code);
+            }
+            // Tiêu đề Date (độ chính xác 1 giây) để phát hiện giờ máy lệch; bỏ qua bản lấy từ bộ đệm.
+            long date = c.getDate();
+            if (date > 0 && c.getHeaderField("Age") == null) {
+                ClockCheck.sample(date, (sentAt + System.currentTimeMillis()) / 2);
             }
             return c;
         }

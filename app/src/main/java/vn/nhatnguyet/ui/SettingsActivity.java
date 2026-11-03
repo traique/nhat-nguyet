@@ -4,7 +4,9 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
@@ -19,7 +21,9 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -36,13 +40,17 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 
 import vn.nhatnguyet.BuildConfig;
+import vn.nhatnguyet.Fmt;
 import vn.nhatnguyet.Prefs;
 import vn.nhatnguyet.R;
 import vn.nhatnguyet.data.DataHub;
 import vn.nhatnguyet.data.WeatherSource;
+import vn.nhatnguyet.lunar.Lunar;
+import vn.nhatnguyet.lunar.PersonalDays;
 import vn.nhatnguyet.net.Http;
 import vn.nhatnguyet.net.Tls;
 import vn.nhatnguyet.sys.AdminReceiver;
@@ -61,9 +69,9 @@ public class SettingsActivity extends Activity implements Updater.Listener {
     private final Handler handler = new Handler();
     private float density;
 
-    private EditText place, watchlist, feeds;
-    private TextView placeState, adminState, updateState, versionText;
-    private Button adminButton, installButton;
+    private EditText place, watchlist, feeds, personalDays;
+    private TextView placeState, personalState, adminState, updateState, versionText;
+    private Button adminButton, installButton, pinButton, pinRemove;
     private CheckBox alwaysOn, burnIn, warmNight, proximity, proximitySleep, wakeMorning, autoStart, autoUpdate;
     private RadioGroup layoutGroup, nightGroup, displayGroup;
     private CheckBox flipInfo;
@@ -154,6 +162,29 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         });
         placeState = note(root, "");
         note(root, "Vị trí chỉ dùng để lấy thời tiết; tên nơi tra từ OpenStreetMap.");
+
+        section(root, "Ngày giỗ, sinh nhật");
+        note(root, "Mỗi dòng một ngày: ngày/tháng, thêm chữ \"âm\" nếu tính theo âm lịch, rồi đến tên. "
+                + "Bảng lịch nhắc trước 7 ngày và đánh dấu chấm đỏ trên lịch tháng.");
+        personalDays = input(root, "15/8 âm Giỗ ông nội\n20/11 Sinh nhật mẹ", InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        personalDays.setSingleLine(false);
+        personalDays.setMinLines(3);
+        personalState = note(root, "");
+        personalDays.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable e) {
+                showPersonalDays(e.toString());
+            }
+        });
 
         section(root, "Trang thông tin");
         note(root, "Các trang xoay vòng bên phải bảng lịch. Chạm để sang trang, vuốt ngang để tiến hoặc lùi.");
@@ -292,6 +323,24 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         if (Build.VERSION.SDK_INT < 26) {
             note(root, "Lần đầu cần bật: Cài đặt > Bảo mật > Nguồn không xác định. Mỗi lần cập nhật cần bấm \"Cài đặt\" một lần.");
         }
+
+        section(root, "Khoá Cài đặt");
+        note(root, "Đặt mã PIN để người khác không đổi được cài đặt khi máy treo ở nơi chung. Quên mã: vào Cài đặt "
+                + "của máy > Ứng dụng > Nhật Nguyệt > Xoá dữ liệu (mất hết cài đặt của app).");
+        pinButton = button(root, "", new Runnable() {
+            @Override
+            public void run() {
+                askNewPin();
+            }
+        });
+        pinRemove = button(root, "Bỏ mã PIN", new Runnable() {
+            @Override
+            public void run() {
+                prefs.setSettingsPin(null);
+                refreshPin();
+                Toast.makeText(SettingsActivity.this, "Đã bỏ khoá Cài đặt", Toast.LENGTH_SHORT).show();
+            }
+        });
 
         section(root, "Giới thiệu");
         LinearLayout about = new LinearLayout(this);
@@ -506,6 +555,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         placeState.setText(placeLabel());
         watchlist.setText(prefs.watchlistRaw());
         feeds.setText(prefs.feedsRaw());
+        personalDays.setText(prefs.personalDaysRaw());
         for (CheckBox c : pageChecks) c.setChecked(prefs.pageEnabled((String) c.getTag()));
         displayGroup.check(prefs.clockOnly() ? 301 : 300);
         flipInfo.setChecked(prefs.flipInfo());
@@ -531,6 +581,28 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         installHour.set(prefs.updateInstallHour());
     }
 
+    /** Xem trước các ngày đã đọc được và lần tới của từng ngày, báo dòng ghi sai. */
+    private void showPersonalDays(String text) {
+        List<Integer> bad = new ArrayList<Integer>();
+        Calendar c = Calendar.getInstance();
+        StringBuilder sb = new StringBuilder();
+        for (Lunar.Holiday h : PersonalDays.parse(text, bad)) {
+            if (sb.length() > 0) sb.append('\n');
+            sb.append(h.name).append(": ").append(h.day).append('/').append(h.month).append(h.lunar ? " âm lịch" : "");
+            Lunar.Upcoming u = Lunar.next(h, c.get(Calendar.DAY_OF_MONTH), c.get(Calendar.MONTH) + 1, c.get(Calendar.YEAR));
+            if (u != null) {
+                sb.append(u.days == 0 ? " · hôm nay" : " · còn " + u.days + " ngày ("
+                        + Fmt.two(u.solar[0]) + "/" + Fmt.two(u.solar[1]) + ")");
+            }
+        }
+        if (!bad.isEmpty()) {
+            if (sb.length() > 0) sb.append('\n');
+            sb.append("Chưa đọc được dòng ").append(android.text.TextUtils.join(", ", bad))
+                    .append(". Cách ghi: 15/8 âm Giỗ ông nội");
+        }
+        personalState.setText(sb.length() > 0 ? sb.toString() : "Chưa có ngày nào.");
+    }
+
     private String placeLabel() {
         return String.format(java.util.Locale.US, "Đang dùng: %s (%.3f, %.3f)", prefs.placeName(), prefs.placeLat(), prefs.placeLon());
     }
@@ -540,6 +612,9 @@ public class SettingsActivity extends Activity implements Updater.Listener {
                 ? "" : watchlist.getText().toString().trim());
         String f = feeds.getText().toString().trim();
         prefs.setFeeds(f);
+        String own = personalDays.getText().toString().trim();
+        prefs.putString("personal_days", own);
+        Lunar.setPersonal(PersonalDays.parse(own, null));
         List<String> pagesOn = new ArrayList<String>();
         for (CheckBox c : pageChecks) if (c.isChecked()) pagesOn.add((String) c.getTag());
         if (pagesOn.isEmpty()) pagesOn.add("sheet");
@@ -753,7 +828,55 @@ public class SettingsActivity extends Activity implements Updater.Listener {
 
     // ------------------------------------------------------------------ trạng thái, quyền
 
+    private void refreshPin() {
+        boolean on = prefs.hasSettingsPin();
+        pinButton.setText(on ? "Đổi mã PIN" : "Đặt mã PIN");
+        pinRemove.setVisibility(on ? View.VISIBLE : View.GONE);
+    }
+
+    private EditText pinField(String hint) {
+        EditText e = new EditText(this);
+        e.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        e.setHint(hint);
+        return e;
+    }
+
+    private void askNewPin() {
+        final EditText first = pinField("Mã PIN mới, 4–8 chữ số");
+        final EditText again = pinField("Nhập lại mã PIN");
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(8), dp(20), 0);
+        box.addView(first);
+        box.addView(again);
+        AlertDialog d = new AlertDialog.Builder(this)
+                .setTitle("Đặt mã PIN cho Cài đặt")
+                .setView(box)
+                .setPositiveButton("Lưu", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        String pin = first.getText().toString();
+                        String msg;
+                        if (!pin.matches("\\d{4,8}")) {
+                            msg = "Mã PIN cần 4–8 chữ số";
+                        } else if (!pin.equals(again.getText().toString())) {
+                            msg = "Hai lần nhập không khớp";
+                        } else {
+                            prefs.setSettingsPin(pin);
+                            refreshPin();
+                            msg = "Đã khoá Cài đặt bằng mã PIN";
+                        }
+                        Toast.makeText(SettingsActivity.this, msg, Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Huỷ", null)
+                .create();
+        d.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+        d.show();
+    }
+
     private void refreshStates() {
+        refreshPin();
         boolean admin = AdminReceiver.isActive(this);
         adminButton.setText(admin ? "Gỡ quyền tắt màn hình (quản trị thiết bị)" : "Cấp quyền tắt màn hình (quản trị thiết bị)");
         adminState.setText(admin ? "Đã cấp quyền: có thể tắt hẳn màn hình ban đêm. Nhớ gỡ quyền trước khi gỡ app."
