@@ -7,8 +7,10 @@ Không cần tài khoản, không quảng cáo, không qua máy chủ trung gian
 • Lịch âm dương theo thuật toán Hồ Ngọc Đức: tháng nhuận, tiết khí, ngày lễ, đếm ngược Tết.
 • Ngày giỗ, sinh nhật theo âm hoặc dương lịch, nhắc trước 7 ngày.
 • Thời tiết theo giờ và 6 ngày, chất lượng không khí, báo sắp mưa (Open-Meteo).
+• Tô đỏ đúng ngày được nghỉ theo luật, kể cả nghỉ bù và lịch nghỉ Tết, Quốc khánh của nhà nước.
 • Đồng hồ lật cỡ lớn.
 • Ngày sáng, đêm giảm sáng hoặc tắt màn; vẫy tay qua cảm biến để bật lại.
+• Tiết kiệm pin cho máy cũ: tắt màn giờ vắng nhà, tự giảm sáng khi pin nóng.
 • Chạy ngoại tuyến với dữ liệu gần nhất.
 
 Bản này không tự cập nhật. Bản cho Android 4.0.3 đến 6 có tại https://github.com/traique/nhat-nguyet/releases.
