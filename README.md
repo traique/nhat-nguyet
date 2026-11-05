@@ -12,6 +12,8 @@
 
 Không cần tài khoản, không quảng cáo, không qua máy chủ trung gian: ứng dụng lấy dữ liệu thẳng từ các nguồn công khai. Mã nguồn mở theo giấy phép Apache 2.0, xem [Quyền riêng tư](PRIVACY.md).
 
+Trang giới thiệu, có nút tải bản mới nhất và hướng dẫn cài: **https://traique.github.io/nhat-nguyet/** (mã trong thư mục `docs/`).
+
 <p align="center">
   <img src="docs/screens/board-6.7.png" alt="Bảng lịch 3 cột trên màn hình 6,7 inch" width="100%">
 </p>

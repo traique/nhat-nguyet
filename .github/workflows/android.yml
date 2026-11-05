@@ -45,6 +45,11 @@ jobs:
       - name: Kiểm thử và lint (API 15, cả hai flavor)
         run: ./gradlew --no-daemon :app:testGithubDebugUnitTest :app:lintGithubDebug :app:lintStoreDebug
 
+      - name: Đối chiếu lịch của trang giới thiệu (docs/lich.js) với app
+        run: |
+          LICH_DUMP="$RUNNER_TEMP/lich.txt" ./gradlew --no-daemon :app:testGithubDebugUnitTest --tests '*LichDumpTest'
+          node docs/lich.test.mjs "$RUNNER_TEMP/lich.txt"
+
       - name: Xác định phiên bản
         id: ver
         env:
