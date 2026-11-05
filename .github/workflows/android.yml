@@ -98,7 +98,7 @@ jobs:
           UPDATE_REPO: ${{ github.repository }}
         run: ./gradlew --no-daemon :app:assembleGithubDebug :app:assembleStoreDebug
 
-      - name: Build bản release đã ký (github: APK có OTA; store: APK và AAB không OTA)
+      - name: 'Build bản release đã ký (github: APK có OTA; store: APK và AAB không OTA)'
         if: steps.ver.outputs.release == 'true'
         env:
           UPDATE_REPO: ${{ github.repository }}
