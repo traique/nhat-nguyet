@@ -40,6 +40,7 @@ Không cần tài khoản, không quảng cáo, không qua máy chủ trung gian
 - **Bảng lịch tự co giãn.** Cột trái luôn hiện giờ, thứ ngày, âm lịch, can chi, ngày lễ, thời tiết hiện tại và pin. Mỗi dữ kiện nằm gọn một dòng; màn nhỏ tự ẩn dòng kém quan trọng thay vì thu chữ.
 - **Tờ lịch.** Ngày dương thật lớn, ngày âm màu đỏ son, can chi, giờ hoàng đạo và một câu ca dao mỗi ngày, như tờ lịch bloc treo tường.
 - **Lịch âm dương chính xác.** Thuật toán Hồ Ngọc Đức theo múi giờ +7: tháng nhuận, can chi ngày tháng năm, tiết khí, ngày và giờ hoàng đạo, ngày lễ (gồm Ngày Văn hóa Việt Nam 24/11 từ năm 2026), đếm ngược Tết.
+- **Ngày nghỉ đúng luật.** Chỉ tô đỏ ngày được nghỉ hưởng lương theo Bộ luật Lao động 2019 (Điều 112) và Nghị quyết 28/2026/QH16, cùng ngày nghỉ bù khi lễ trùng cuối tuần (khoản 3 Điều 111). Ngày nghỉ Tết, ngày liền kề Quốc khánh và ngày hoán đổi theo lịch khối nhà nước đã công bố (hiện có 2026 và 2027); năm chưa công bố chỉ đánh dấu những ngày chắc chắn nghỉ. Ngày kỷ niệm không được nghỉ chỉ ghi tên.
 - **Thông tin cập nhật.** Thời tiết theo giờ và 6 ngày, giá vàng, giá xăng dầu, tỷ giá Vietcombank, chứng khoán trong phiên, tin tức RSS. Các trang tự xoay vòng; chạm để sang trang, vuốt ngang để tiến hoặc lùi.
 - **Đồng hồ lật.** Chế độ chỉ đồng hồ với hai thẻ giờ phút cỡ lớn, kèm ngày, âm lịch và thời tiết nếu muốn.
 - **Vuốt để chỉnh độ sáng.** Vuốt lên hoặc xuống trên đồng hồ để tăng giảm độ sáng ngay; mức mới được lưu cho ban ngày hoặc ban đêm tuỳ lúc chỉnh.
@@ -152,7 +153,8 @@ Workflow `.github/workflows/android.yml` chạy kiểm thử và lint cho cả h
 app/src/main/java/vn/nhatnguyet/
   App, Prefs, Fmt, Theme   cài đặt, định dạng số kiểu Việt Nam, bảng màu ngày/đêm
   net/      Tls (Conscrypt + kho chứng chỉ gốc), Http, ClockCheck (phát hiện giờ máy lệch)
-  lunar/    Lunar (âm lịch, can chi, tiết khí, hoàng đạo, ngày lễ), LunarDate, PersonalDays (ngày giỗ, sinh nhật)
+  lunar/    Lunar (âm lịch, can chi, tiết khí, hoàng đạo, ngày lễ), LunarDate, PersonalDays (ngày giỗ, sinh nhật),
+            DaysOff (ngày nghỉ theo luật, nghỉ bù, lịch nghỉ chính thức từng năm)
   data/     DataHub (lịch tải, bộ nhớ đệm), các nguồn Weather, Gold, Fuel, Fx, Stock, News; Html, J (tiện ích đọc)
   ui/       MainActivity (bảng lịch), NightPolicy (chính sách màn hình ngày/đêm/vắng nhà), Pages, SettingsActivity, các view tự vẽ
   sys/      WakeService + ProximityGesture (cảm biến tiệm cận), Screen, BootReceiver, Scheduler, ScheduleReceiver, AdminReceiver,
@@ -165,7 +167,7 @@ Luồng dữ liệu: `Source.fetch()` chạy trên pool 2 luồng, kết quả v
 
 ## Đã kiểm thử
 
-- Kiểm thử đơn vị (63 ca): âm lịch (Tết 2020–2033 và 1985, tháng nhuận 2023 và 2025, mùng 2 mùng 3 Tết, Giao thừa, Ngày Văn hóa Việt Nam, tiết khí sát nửa đêm, hai ngày xa 2054 và 2062, đổi qua lại 1990–2060), ngày giỗ (kèm năm, 29/2), dãy giờ dự báo theo giờ hiện tại, định dạng số, cử chỉ cảm biến, chính sách màn hình ngày/đêm/vắng nhà, giảm sáng khi pin nóng hoặc yếu, thống kê pin, lịch báo thức bật màn, gom mốc tải ở chế độ tiết kiệm pin, bộ đọc giá vàng, xăng dầu, tỷ giá, thời tiết và RSS trên dữ liệu thật. Chưa có test giao diện.
+- Kiểm thử đơn vị (69 ca, gồm đối chiếu lịch nghỉ chính thức 2026, 2027 và quy tắc nghỉ bù): âm lịch (Tết 2020–2033 và 1985, tháng nhuận 2023 và 2025, mùng 2 mùng 3 Tết, Giao thừa, Ngày Văn hóa Việt Nam, tiết khí sát nửa đêm, hai ngày xa 2054 và 2062, đổi qua lại 1990–2060), ngày giỗ (kèm năm, 29/2), dãy giờ dự báo theo giờ hiện tại, định dạng số, cử chỉ cảm biến, chính sách màn hình ngày/đêm/vắng nhà, giảm sáng khi pin nóng hoặc yếu, thống kê pin, lịch báo thức bật màn, gom mốc tải ở chế độ tiết kiệm pin, bộ đọc giá vàng, xăng dầu, tỷ giá, thời tiết và RSS trên dữ liệu thật. Chưa có test giao diện.
 - Máy ảo Android 4.1.2 (API 16): cài APK ký v1, TLS qua Conscrypt, tải đủ các nguồn dữ liệu, font tiếng Việt, xoay trang, vẫy tay bật màn và trọn quy trình tự cập nhật.
 - Bố cục dựng thử ở 480×320 dp (3,5"), 640×360 dp (5,5") và 915×411 dp (6,7").
 - Chưa thử trên máy thật Android 4.0.3 và máy 6,7" thật.
@@ -173,6 +175,7 @@ Luồng dữ liệu: `Source.fetch()` chạy trên pool 2 luồng, kết quả v
 ## Lưu ý
 
 - vang.today, giaxanghomnay.com và Entrade/DNSE là nguồn không chính thức, có thể thay đổi bất cứ lúc nào.
+- Lịch nghỉ theo khối cơ quan nhà nước (nghỉ thứ Bảy, Chủ nhật). Doanh nghiệp tự chọn phương án nghỉ Tết và ngày liền kề Quốc khánh nên có thể khác. Mỗi năm, khi Bộ Nội vụ công bố lịch nghỉ năm sau (thường tháng 10), cần thêm một dòng vào `DaysOff.OFFICIAL` và phát hành bản mới.
 - Nhiều máy đời mới chỉ bật cảm biến tiệm cận khi đang gọi, nên vẫy tay có thể không đánh thức được màn hình đã tắt.
 - Điện thoại cũ cắm sạc liên tục dễ phồng pin. Ứng dụng không tự ngắt sạc được (Android không cho phép nếu máy chưa root). Nên để máy chỗ thoáng, tháo ốp, giữ ban đêm tắt màn, và cân nhắc ổ cắm hẹn giờ hoặc tính năng giới hạn sạc của hãng nếu máy có. Bảng lịch tự giảm sáng và báo khi pin nóng từ 42°C.
 

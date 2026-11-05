@@ -51,6 +51,7 @@ import vn.nhatnguyet.data.DataHub;
 import vn.nhatnguyet.data.Source;
 import vn.nhatnguyet.data.WeatherCodes;
 import vn.nhatnguyet.data.WeatherSource;
+import vn.nhatnguyet.lunar.DaysOff;
 import vn.nhatnguyet.lunar.Lunar;
 import vn.nhatnguyet.lunar.LunarDate;
 import vn.nhatnguyet.net.ClockCheck;
@@ -1073,9 +1074,12 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             flipDate.setText(Fmt.WEEKDAYS[now.get(Calendar.DAY_OF_WEEK)] + ", "
                     + (flipNarrow ? Fmt.ddmm(now) : Fmt.ddmmyyyy(now)));
             LunarDate ld = Lunar.solarToLunar(now.get(Calendar.DAY_OF_MONTH), now.get(Calendar.MONTH) + 1, now.get(Calendar.YEAR));
-            Lunar.Holiday hol = Lunar.eventOn(now.get(Calendar.DAY_OF_MONTH), now.get(Calendar.MONTH) + 1, ld);
+            int dd = now.get(Calendar.DAY_OF_MONTH), mm = now.get(Calendar.MONTH) + 1;
+            Lunar.Holiday hol = Lunar.eventOn(dd, mm, ld);
+            String off = hol == null ? DaysOff.name(dd, mm, now.get(Calendar.YEAR)) : null;
             String lunar = "Âm lịch " + ld.day + "/" + ld.month + (ld.leap ? " nhuận" : "") + " " + Lunar.yearCanChi(ld.year);
             if (hol != null) lunar += " · " + hol.name;
+            else if (off != null) lunar += " · " + off;
             flipLunar.setText(lunar);
             flipLunar.setTextColor(Theme.LUNAR);
         }
@@ -1313,12 +1317,16 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         canChiLine.set(Theme.DIM, day + " · tháng " + Lunar.monthCanChi(ld.month, ld.year), day);
 
         Lunar.Holiday hol = Lunar.eventOn(d, m, ld);
+        String off = hol == null ? DaysOff.name(d, m, y) : null;
         // Ngày riêng (giỗ, sinh nhật) được nhắc trước một tuần, trước cả mùng 1, rằm.
-        Lunar.Upcoming soon = hol == null ? Lunar.nextPersonal(d, m, y, 7) : null;
+        Lunar.Upcoming soon = hol == null && off == null ? Lunar.nextPersonal(d, m, y, 7) : null;
         String[] ev;
         int color = Theme.LUNAR;
         if (hol != null) {
             ev = new String[]{"Hôm nay: " + hol.name, hol.name};
+        } else if (off != null) {
+            // Nghỉ bù, ngày nghỉ Tết, nghỉ hoán đổi theo lịch nhà nước.
+            ev = new String[]{"Hôm nay: " + off, off};
         } else if (soon != null) {
             ev = new String[]{(soon.days == 1 ? "Ngày mai: " : "Còn " + soon.days + " ngày: ") + soon.holiday.name, soon.holiday.name};
         } else if (ld.day == 1 && !ld.leap) {

@@ -17,6 +17,7 @@ import vn.nhatnguyet.data.DataHub;
 import vn.nhatnguyet.data.WeatherSource;
 import vn.nhatnguyet.data.StockSource;
 import vn.nhatnguyet.data.WeatherCodes;
+import vn.nhatnguyet.lunar.DaysOff;
 import vn.nhatnguyet.lunar.Lunar;
 import vn.nhatnguyet.lunar.LunarDate;
 
@@ -149,7 +150,8 @@ final class Pages {
         LunarDate ld = Lunar.solarToLunar(d, m, y);
         Lunar.Holiday hol = Lunar.holidayOn(d, m, ld);
         Lunar.Holiday own = Lunar.personalOn(d, m, ld);
-        boolean red = hol != null || now.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY;
+        String off = DaysOff.name(d, m, y);
+        boolean red = DaysOff.isRed(d, m, y, ld) || now.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY;
         int solarColor = red ? Theme.LUNAR : Theme.TEXT;
 
         LinearLayout faces = ui.row();
@@ -194,11 +196,13 @@ final class Pages {
         FitColumn col = column();
         col.addFill(faces);
 
-        if (hol != null || own != null) {
+        // Ngày nghỉ không có tên lễ riêng (nghỉ bù, nghỉ Tết, hoán đổi) thì ghi tên ngày nghỉ.
+        String holName = hol != null ? hol.name : off;
+        if (holName != null || own != null) {
             FitLine h = line(BODY, true);
             h.setCenter(true);
-            if (own != null && hol != null) h.set(Theme.LUNAR, own.name + " · " + hol.name, own.name);
-            else h.set(Theme.LUNAR, own != null ? own.name : hol.name);
+            if (own != null && holName != null) h.set(Theme.LUNAR, own.name + " · " + holName, own.name);
+            else h.set(Theme.LUNAR, own != null ? own.name : holName);
             col.add(h, 1, ui.px(8));
         }
         StringBuilder gio = new StringBuilder();

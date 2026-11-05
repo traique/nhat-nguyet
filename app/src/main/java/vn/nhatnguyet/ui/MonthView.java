@@ -9,6 +9,7 @@ import android.view.View;
 import java.util.Calendar;
 
 import vn.nhatnguyet.Theme;
+import vn.nhatnguyet.lunar.DaysOff;
 import vn.nhatnguyet.lunar.Lunar;
 import vn.nhatnguyet.lunar.LunarDate;
 
@@ -85,7 +86,8 @@ public class MonthView extends View {
         for (int d = 1; d <= daysInMonth; d++) {
             LunarDate ld = Lunar.solarToLunar(d, month, year);
             lunars[d] = ld;
-            holiday[d] = Lunar.holidayOn(d, month, ld) != null;
+            // Đỏ: ngày được nghỉ theo luật (kể cả nghỉ bù, nghỉ Tết); ngày kỷ niệm không nghỉ thì không tô.
+            holiday[d] = DaysOff.isRed(d, month, year, ld);
             good[d] = Lunar.isHoangDao(ld.jd, ld.month);
             personal[d] = Lunar.personalOn(d, month, ld) != null;
             anyPersonal |= personal[d];

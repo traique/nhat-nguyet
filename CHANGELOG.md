@@ -19,6 +19,11 @@
   - Chế độ Tiết kiệm pin: tải dữ liệu gom một lần mỗi 30 phút, đổi trang ít nhất 1 phút, đồng hồ lật không chạy hiệu ứng.
   - Thống kê pin trong Cài đặt: tụt bao nhiêu %/giờ khi màn sáng, màn tắt, sạc nhanh cỡ nào, nóng nhất 24 giờ qua.
 - Sửa lỗi mở Cài đặt là bị hỏi cấp quyền quản trị dù không chọn gì.
+- Ngày nghỉ theo pháp luật Việt Nam (Bộ luật Lao động 2019 Điều 111, 112; Nghị quyết 28/2026/QH16):
+  - Lịch tháng và tờ lịch chỉ tô đỏ ngày được nghỉ; ngày kỷ niệm không nghỉ như 8/3, 20/10, 20/11, Trung thu, Giáng sinh, Valentine chỉ ghi tên.
+  - Thêm ngày nghỉ bù khi ngày lễ trùng thứ Bảy, Chủ nhật, ngày nghỉ Tết và ngày liền kề Quốc khánh theo lịch khối nhà nước đã công bố cho 2026 và 2027, kể cả ngày hoán đổi và thứ Bảy làm bù.
+  - Bảng lịch ghi "Hôm nay: Nghỉ bù …", "Nghỉ Tết Nguyên đán", "Nghỉ hoán đổi".
+  - Giờ vắng nhà theo đúng lịch nghỉ này.
 - Tiết khí có hiệu chỉnh chương động; sửa hai ngày xa (2054, 2062) bị tính sai tháng âm.
 - Thêm giấy phép Apache 2.0, NOTICE, chính sách quyền riêng tư; ghi công Open-Meteo, OpenStreetMap trong app.
 - Thư viện Conscrypt 2.5.3 (căn trang 16 KB). Thêm bản "store" (Android 7+, không tự cập nhật) cho F-Droid/Google Play.

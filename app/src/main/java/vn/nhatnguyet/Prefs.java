@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+import vn.nhatnguyet.lunar.DaysOff;
 import vn.nhatnguyet.lunar.Lunar;
 
 /** Toàn bộ cài đặt của app (SharedPreferences "settings"). */
@@ -196,14 +197,21 @@ public final class Prefs {
         return inHours(now.get(Calendar.HOUR_OF_DAY), awayStart(), awayEnd());
     }
 
-    /** Ngày có áp dụng giờ vắng nhà: bỏ thứ Bảy, Chủ nhật (nếu chọn) và các ngày nghỉ lễ. */
+    /**
+     * Ngày có áp dụng giờ vắng nhà. weekdaysOnly: theo ngày làm việc của cơ quan nhà nước, tức thứ Hai đến thứ Sáu,
+     * trừ ngày nghỉ lễ, Tết, nghỉ bù, nghỉ hoán đổi (DaysOff), nhưng tính cả thứ Bảy phải đi làm bù.
+     */
     public static boolean isAwayDay(Calendar c, boolean weekdaysOnly) {
         if (!weekdaysOnly) return true;
-        int dow = c.get(Calendar.DAY_OF_WEEK);
-        if (dow == Calendar.SATURDAY || dow == Calendar.SUNDAY) return false;
         int d = c.get(Calendar.DAY_OF_MONTH);
         int m = c.get(Calendar.MONTH) + 1;
-        Lunar.Holiday h = Lunar.holidayOn(d, m, Lunar.solarToLunar(d, m, c.get(Calendar.YEAR)));
+        int y = c.get(Calendar.YEAR);
+        if (DaysOff.isMakeUpWorkday(d, m, y)) return true;
+        int dow = c.get(Calendar.DAY_OF_WEEK);
+        if (dow == Calendar.SATURDAY || dow == Calendar.SUNDAY) return false;
+        // Năm chưa có lịch chính thức: coi mọi ngày có thể được nghỉ Tết, Quốc khánh là ở nhà.
+        if (DaysOff.likelyOff(d, m, y)) return false;
+        Lunar.Holiday h = Lunar.holidayOn(d, m, Lunar.solarToLunar(d, m, y));
         return h == null || !h.major;
     }
 

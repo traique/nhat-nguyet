@@ -280,7 +280,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         root.addView(awayBox, new LinearLayout.LayoutParams(-1, -2));
         awayStart = new Slider(awayBox, "Vắng từ", 0, 23, 1, hour);
         awayEnd = new Slider(awayBox, "Đến", 1, 24, 1, hour);
-        awayWeekdays = check(awayBox, "Chỉ thứ Hai đến thứ Sáu, trừ ngày nghỉ lễ");
+        awayWeekdays = check(awayBox, "Chỉ ngày làm việc: thứ Hai đến thứ Sáu, trừ ngày nghỉ lễ, Tết, nghỉ bù");
         note(awayBox, "Trong giờ này màn tắt khi không ai chạm, như ban đêm, và vẫy tay không bật màn để máy ngủ. "
                 + "Về sớm thì bấm nút nguồn. Hết giờ vắng, màn tự bật lại nếu chọn \"Tự bật màn hình\" ở mục dưới.");
         awayEnabled.setOnCheckedChangeListener(new android.widget.CompoundButton.OnCheckedChangeListener() {

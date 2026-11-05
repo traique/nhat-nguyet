@@ -52,6 +52,12 @@ public class SchedulerTest {
         assertFalse(Prefs.isAwayDay(at(2026, 9, 2, 10, 0), true));   // Quốc khánh
         assertTrue(Prefs.isAwayDay(at(2026, 11, 20, 10, 0), true));  // 20/11 không phải ngày nghỉ
         assertTrue(Prefs.isAwayDay(at(2026, 11, 8, 10, 0), false));  // không giới hạn ngày
+        assertFalse(Prefs.isAwayDay(at(2026, 4, 27, 10, 0), true));  // nghỉ bù Giỗ Tổ
+        assertFalse(Prefs.isAwayDay(at(2026, 8, 31, 10, 0), true));  // nghỉ hoán đổi dịp Quốc khánh
+        assertTrue(Prefs.isAwayDay(at(2026, 8, 22, 10, 0), true));   // thứ Bảy đi làm bù
+        assertFalse(Prefs.isAwayDay(at(2026, 2, 18, 10, 0), true));  // nghỉ Tết
+        assertFalse(Prefs.isAwayDay(at(2027, 2, 9, 10, 0), true));   // nghỉ bù Tết 2027
+        assertFalse(Prefs.isAwayDay(at(2028, 1, 28, 10, 0), true));  // năm chưa có lịch: mùng 3 có thể nghỉ
         assertTrue(Prefs.inHours(8, 8, 17));
         assertFalse(Prefs.inHours(17, 8, 17));
         assertTrue(Prefs.inHours(23, 22, 6));
