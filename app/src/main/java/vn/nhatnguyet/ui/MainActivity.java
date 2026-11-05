@@ -15,6 +15,7 @@ import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.text.InputType;
 import android.provider.Settings;
@@ -54,7 +55,10 @@ import vn.nhatnguyet.lunar.Lunar;
 import vn.nhatnguyet.lunar.LunarDate;
 import vn.nhatnguyet.net.ClockCheck;
 import vn.nhatnguyet.sys.AdminReceiver;
+import vn.nhatnguyet.sys.BatteryGuard;
+import vn.nhatnguyet.sys.BatteryStats;
 import vn.nhatnguyet.sys.Scheduler;
+import vn.nhatnguyet.sys.Screen;
 import vn.nhatnguyet.sys.WakeService;
 import vn.nhatnguyet.update.Updater;
 
@@ -138,7 +142,11 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
     private long lastBack;
     /** Android 10+ chưa cấp "hiện trên ứng dụng khác" trong khi có tuỳ chọn tự bật lại đang bật. */
     private boolean overlayMissing;
+    /** Chế độ đêm/giờ vắng là tắt màn nhưng chưa có quyền quản trị thiết bị nên chỉ tắt theo thời gian chờ. */
+    private boolean adminActive;
     private boolean setupDialogShown;
+    private static final int REQ_ADMIN = 11;
+    private final BatteryGuard batteryGuard = new BatteryGuard();
     private int shiftStep;
     private String dayKey = "";
     private final Map<String, String> rendered = new HashMap<String, String>();
@@ -225,6 +233,38 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             @Override
             public void onDismiss(DialogInterface dialog) {
                 touch();
+                askNightOff();
+            }
+        });
+        d.show();
+    }
+
+    /** Lần đầu: ban đêm tắt hẳn màn (tiết kiệm pin nhất) cần quyền quản trị thiết bị. */
+    private void askNightOff() {
+        if (Prefs.NIGHT_DIM.equals(prefs.nightMode()) || AdminReceiver.isActive(this)) return;
+        AlertDialog d = new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+                .setTitle("Ban đêm tắt màn hình?")
+                .setMessage("Từ " + prefs.dayEnd() % 24 + ":00 đến " + prefs.dayStart() + ":00, màn hình tắt hẳn khi không ai chạm "
+                        + "để đỡ tốn pin, đỡ nóng máy. Cần cấp quyền quản trị thiết bị, chỉ dùng để tắt màn hình. "
+                        + "Chạm màn hình hoặc bấm nút nguồn để xem giờ.")
+                .setPositiveButton("Cấp quyền", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        prefs.putString("night_mode", Prefs.NIGHT_OFF);
+                        requestAdmin();
+                    }
+                })
+                .setNegativeButton("Chỉ giảm sáng", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        prefs.putString("night_mode", Prefs.NIGHT_DIM);
+                    }
+                })
+                .create();
+        d.setOnDismissListener(new DialogInterface.OnDismissListener() {
+            @Override
+            public void onDismiss(DialogInterface dialog) {
+                touch();
             }
         });
         d.show();
@@ -300,7 +340,7 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         handler.removeCallbacksAndMessages(null);
         scheduleClock();
         handler.postDelayed(policyTick, POLICY_MS);
-        handler.postDelayed(rotateTick, prefs.rotateSeconds() * 1000L);
+        handler.postDelayed(rotateTick, prefs.rotateMs());
         handler.postDelayed(shiftTick, SHIFT_MS);
         maybeShowSetup();
     }
@@ -310,6 +350,33 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
     private void checkOverlay() {
         boolean need = prefs.autoStart() || prefs.wakeMorning() || prefs.proximityWake();
         overlayMissing = Build.VERSION.SDK_INT >= 29 && need && !Settings.canDrawOverlays(this);
+        adminActive = AdminReceiver.isActive(this);
+    }
+
+    /** Lúc này cần tắt màn (đêm chế độ tắt, hoặc giờ vắng nhà) mà chưa có quyền quản trị để tắt hẳn. */
+    private boolean adminHint() {
+        if (adminActive) return false;
+        Calendar now = Calendar.getInstance();
+        if (prefs.isAway(now)) return true;
+        return prefs.isNight(now) && !Prefs.NIGHT_DIM.equals(prefs.nightMode());
+    }
+
+    private void requestAdmin() {
+        try {
+            startActivityForResult(AdminReceiver.requestIntent(this), REQ_ADMIN);
+        } catch (Throwable t) {
+            Toast.makeText(this, "Máy không hỗ trợ quyền quản trị; màn sẽ tắt theo thời gian chờ của máy", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_ADMIN) {
+            adminActive = AdminReceiver.isActive(this);
+            Toast.makeText(this, adminActive ? "Ban đêm màn hình sẽ tắt hẳn khi không ai chạm"
+                    : "Chưa cấp quyền: ban đêm màn tắt theo thời gian chờ của máy", Toast.LENGTH_LONG).show();
+        }
     }
 
     /** Người dùng chỉnh giờ máy: bỏ các mẫu đo cũ, kiểm lại ngay. */
@@ -344,6 +411,7 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
     @Override
     protected void onPause() {
         resumed = false;
+        recordBatteryOnPause();
         hub.removeListener(this);
         updater.removeListener(this);
         hub.stop();
@@ -524,7 +592,7 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
                     renderPage();
                 }
             }
-            handler.postDelayed(this, Math.max(5, prefs.rotateSeconds()) * 1000L);
+            handler.postDelayed(this, prefs.rotateMs());
         }
     };
 
@@ -573,17 +641,27 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         handler.removeCallbacks(rotateTick);
         handler.removeCallbacks(shiftTick);
         if (!on && resumed) {
-            handler.postDelayed(rotateTick, Math.max(5, prefs.rotateSeconds()) * 1000L);
+            handler.postDelayed(rotateTick, prefs.rotateMs());
             handler.postDelayed(shiftTick, SHIFT_MS);
         }
     }
 
     private void applyScreenPolicy() {
-        boolean night = prefs.isNight(Calendar.getInstance());
-        if (!night) lockedThisIdle = false;
-        NightPolicy p = NightPolicy.decide(night, prefs.nightMode(), SystemClock.elapsedRealtime() - lastInteraction,
-                prefs.idleMinutes() * 60_000L, prefs.dayBrightness(), prefs.nightBrightness(), liveBrightness,
-                blackout, lockedThisIdle);
+        Calendar now = Calendar.getInstance();
+        NightPolicy.Input in = new NightPolicy.Input();
+        in.night = prefs.isNight(now);
+        in.away = prefs.isAway(now);
+        if (!in.night && !in.away) lockedThisIdle = false;
+        in.mode = prefs.nightMode();
+        in.idleMs = SystemClock.elapsedRealtime() - lastInteraction;
+        in.idleLimitMs = prefs.idleMinutes() * 60_000L;
+        in.dayPercent = prefs.dayBrightness();
+        in.nightPercent = prefs.nightBrightness();
+        in.livePercent = liveBrightness;
+        in.capPercent = batteryGuard.cap();
+        in.blackout = blackout;
+        in.lockedAlready = lockedThisIdle;
+        NightPolicy p = NightPolicy.decide(in);
         if (p.lockNow && resumed) {
             lockedThisIdle = true;
             AdminReceiver.lockNow(this);
@@ -987,8 +1065,9 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
 
     private void renderFlipClock(Calendar now) {
         if (flipHours == null) return;
-        flipHours.setText(Fmt.two(now.get(Calendar.HOUR_OF_DAY)), true);
-        flipMinutes.setText(Fmt.two(now.get(Calendar.MINUTE)), true);
+        boolean animate = !prefs.batterySaver(); // tiết kiệm pin: đổi số ngay, không hiệu ứng lật
+        flipHours.setText(Fmt.two(now.get(Calendar.HOUR_OF_DAY)), animate);
+        flipMinutes.setText(Fmt.two(now.get(Calendar.MINUTE)), animate);
         if (flipDate != null) {
             // Màn hẹp (3,5"–4"): bỏ năm để dòng ngày + âm lịch vừa một hàng.
             flipDate.setText(Fmt.WEEKDAYS[now.get(Calendar.DAY_OF_WEEK)] + ", "
@@ -1025,6 +1104,18 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
 
     // ------------------------------------------------------------------ pin
 
+    /** Ghi mẫu pin lúc rời bảng lịch: màn tắt thì mẫu này mở đầu khoảng "màn tắt" trong thống kê. */
+    private void recordBatteryOnPause() {
+        if (battPct < 0) return;
+        try {
+            Intent sticky = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            if (sticky != null) parseBattery(sticky);
+        } catch (Throwable ignored) {
+        }
+        boolean screenOn = Screen.isOn((PowerManager) getSystemService(POWER_SERVICE));
+        BatteryStats.get(this).record(System.currentTimeMillis(), battPct, battCharging, battTemp, screenOn);
+    }
+
     private final BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -1034,6 +1125,14 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
 
     private void readBattery(Intent i) {
         if (i == null) return;
+        parseBattery(i);
+        BatteryStats.get(this).record(System.currentTimeMillis(), battPct, battCharging, battTemp, true);
+        // Pin nóng hoặc yếu: giảm sáng ngay (MainActivity chỉ nhận khi bảng lịch đang hiện, tức màn đang sáng).
+        if (batteryGuard.update(battPct, battCharging, battTemp)) applyScreenPolicy();
+        renderBattery();
+    }
+
+    private void parseBattery(Intent i) {
         int level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
         int scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
         battPct = level < 0 || scale <= 0 ? -1 : Math.round(level * 100f / scale);
@@ -1043,7 +1142,6 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
                 || status == BatteryManager.BATTERY_STATUS_FULL;
         int temp = i.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Integer.MIN_VALUE);
         battTemp = temp == Integer.MIN_VALUE ? Float.NaN : temp / 10f;
-        renderBattery();
     }
 
     private void renderBattery() {
@@ -1058,9 +1156,12 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         battText.setVisibility(View.VISIBLE);
         String s = battPct + "%";
         int color = battPct < 20 && !battCharging ? Theme.DOWN : Theme.DIM;
-        // Máy cắm sạc liên tục dễ nóng/phồng pin: cảnh báo khi pin quá nóng.
-        if (!Float.isNaN(battTemp) && battTemp >= 45f) {
-            s += " · " + Math.round(battTemp) + "°C";
+        // Máy cắm sạc liên tục dễ nóng/phồng pin: báo nhiệt độ và việc đã tự giảm sáng.
+        if (batteryGuard.hot()) {
+            s += " · " + Math.round(battTemp) + "°C, đã giảm sáng";
+            color = Theme.WARN;
+        } else if (batteryGuard.low()) {
+            s += " · pin yếu, đã giảm sáng";
             color = Theme.WARN;
         }
         battText.setText(s);
@@ -1360,6 +1461,11 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             statusText.set(Theme.WARN, "Lỗi tải " + err + " · chạm để thử lại", "Lỗi tải " + err, "Lỗi tải dữ liệu");
             return;
         }
+        if (adminHint()) {
+            statusText.set(Theme.WARN, "Để tắt hẳn màn khi không ai chạm, cấp quyền tắt màn hình · chạm để cấp",
+                    "Chưa có quyền tắt màn hình · chạm để cấp", "Thiếu quyền tắt màn · chạm");
+            return;
+        }
         if (overlayMissing) {
             statusText.set(Theme.WARN, "Để tự bật lại, cho phép hiện trên ứng dụng khác · chạm để cấp",
                     "Chưa cho phép hiện trên ứng dụng khác · chạm để cấp", "Thiếu quyền tự bật lại · chạm");
@@ -1386,6 +1492,8 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             } catch (Throwable t) {
                 Toast.makeText(this, "Mở Cài đặt của máy > Ngày và giờ, bật Tự động", Toast.LENGTH_LONG).show();
             }
+        } else if (adminHint() && errorCount() == 0) {
+            requestAdmin();
         } else if (overlayMissing && errorCount() == 0) {
             try {
                 startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,

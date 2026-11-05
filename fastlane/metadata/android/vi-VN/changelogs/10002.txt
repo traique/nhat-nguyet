@@ -4,3 +4,4 @@
 • Sửa lỗi có thể làm app đóng khi dùng "Dùng vị trí hiện tại".
 • Phím Back không còn thoát nhầm; nhắc cấp quyền tự bật lại trên Android 10+.
 • Bỏ quyền vị trí chính xác và báo thức chính xác.
+• Tiết kiệm pin: ban đêm tắt màn, giờ vắng nhà, tự giảm sáng khi pin nóng, chế độ Tiết kiệm pin, thống kê pin.

@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+import vn.nhatnguyet.lunar.Lunar;
+
 /** Toàn bộ cài đặt của app (SharedPreferences "settings"). */
 public final class Prefs {
     public static final String NIGHT_DIM = "dim";
@@ -163,8 +165,65 @@ public final class Prefs {
         return sp.getInt("day_end", 22);
     }
 
+    /** Mặc định tắt màn ban đêm (có quyền quản trị thì tắt hẳn, chưa có thì theo thời gian chờ của máy). */
     public String nightMode() {
-        return sp.getString("night_mode", NIGHT_TIMEOUT);
+        return sp.getString("night_mode", NIGHT_OFF);
+    }
+
+    // ------------------------------------------------------------ giờ vắng nhà, tiết kiệm pin
+
+    /** Tắt màn trong giờ cả nhà vắng (đi làm, đi học). */
+    public boolean awayEnabled() {
+        return sp.getBoolean("away_enabled", false);
+    }
+
+    public int awayStart() {
+        return sp.getInt("away_start", 8);
+    }
+
+    public int awayEnd() {
+        return sp.getInt("away_end", 17);
+    }
+
+    /** Chỉ thứ Hai đến thứ Sáu và không tính ngày nghỉ lễ. */
+    public boolean awayWeekdaysOnly() {
+        return sp.getBoolean("away_weekdays", true);
+    }
+
+    /** Đang trong giờ vắng nhà. */
+    public boolean isAway(Calendar now) {
+        if (!awayEnabled() || !isAwayDay(now, awayWeekdaysOnly())) return false;
+        return inHours(now.get(Calendar.HOUR_OF_DAY), awayStart(), awayEnd());
+    }
+
+    /** Ngày có áp dụng giờ vắng nhà: bỏ thứ Bảy, Chủ nhật (nếu chọn) và các ngày nghỉ lễ. */
+    public static boolean isAwayDay(Calendar c, boolean weekdaysOnly) {
+        if (!weekdaysOnly) return true;
+        int dow = c.get(Calendar.DAY_OF_WEEK);
+        if (dow == Calendar.SATURDAY || dow == Calendar.SUNDAY) return false;
+        int d = c.get(Calendar.DAY_OF_MONTH);
+        int m = c.get(Calendar.MONTH) + 1;
+        Lunar.Holiday h = Lunar.holidayOn(d, m, Lunar.solarToLunar(d, m, c.get(Calendar.YEAR)));
+        return h == null || !h.major;
+    }
+
+    /** Giờ h có nằm trong [start, end) không, kể cả khoảng qua nửa đêm; start == end là không có giờ nào. */
+    public static boolean inHours(int h, int start, int end) {
+        if (start == end) return false;
+        if (start < end) return h >= start && h < end;
+        return h >= start || h < end;
+    }
+
+    /** Tiết kiệm pin: tải dữ liệu gom mỗi 30 phút, đổi trang chậm hơn, không hiệu ứng lật. */
+    public boolean batterySaver() {
+        return sp.getBoolean("battery_saver", false);
+    }
+
+    /** Thời gian đổi trang thực tế (chế độ tiết kiệm pin: ít nhất 60 giây). */
+    public long rotateMs() {
+        int s = Math.max(5, rotateSeconds());
+        if (batterySaver()) s = Math.max(60, s);
+        return s * 1000L;
     }
 
     public int idleMinutes() {

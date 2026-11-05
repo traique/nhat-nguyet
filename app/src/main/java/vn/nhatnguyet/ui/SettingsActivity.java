@@ -8,6 +8,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.hardware.Sensor;
@@ -15,6 +16,7 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.Uri;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -58,6 +60,8 @@ import vn.nhatnguyet.lunar.PersonalDays;
 import vn.nhatnguyet.net.Http;
 import vn.nhatnguyet.net.Tls;
 import vn.nhatnguyet.sys.AdminReceiver;
+import vn.nhatnguyet.sys.BatteryGuard;
+import vn.nhatnguyet.sys.BatteryStats;
 import vn.nhatnguyet.sys.Scheduler;
 import vn.nhatnguyet.sys.WakeService;
 import vn.nhatnguyet.update.Updater;
@@ -84,6 +88,12 @@ public class SettingsActivity extends Activity implements Updater.Listener {
     private TextView placeState, personalState, updateState, versionText, versionDetail;
     private Button installButton, pinButton, pinRemove;
     private CheckBox alwaysOn, burnIn, warmNight, proximity, proximitySleep, wakeMorning, autoStart, autoUpdate, flipInfo;
+    private CheckBox awayEnabled, awayWeekdays, batterySaver;
+    private Slider awayStart, awayEnd;
+    private LinearLayout awayBox;
+    private TextView batteryState;
+    /** Đang nạp giá trị đã lưu vào giao diện: bộ lắng nghe không được coi đó là người dùng chọn. */
+    private boolean loading;
     private RadioGroup layoutGroup, nightGroup, displayGroup;
     private Slider rotate, fontScale, dayStart, dayEnd, idle, nightBright, dayBright;
     private final List<CheckBox> pageChecks = new ArrayList<CheckBox>();
@@ -252,23 +262,52 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         label(root, "Ban đêm");
         nightGroup = radios(root, 200, new String[]{
                 "Chỉ giảm độ sáng, màn vẫn sáng",
-                "Tắt màn hình khi không ai chạm"});
+                "Tắt màn hình khi không ai chạm (khuyên dùng, đỡ tốn pin)"});
         nightGroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(RadioGroup group, int checkedId) {
-                if (checkedId == 201 && !AdminReceiver.isActive(SettingsActivity.this)) askAdmin();
+                if (!loading && checkedId == 201 && !AdminReceiver.isActive(SettingsActivity.this)) askAdmin();
             }
         });
         note(root, "Tắt màn hình cần quyền quản trị thiết bị (xin ngay khi chọn). Chưa có quyền thì màn tối đen "
                 + "rồi tự tắt theo thời gian chờ của máy, nên đặt thời gian chờ khoảng 15–30 giây. "
                 + "Để bảng tự hiện lại khi bật màn, đặt khoá màn hình là \"Không\" hoặc \"Vuốt\".");
 
+        label(root, "Giờ vắng nhà");
+        awayEnabled = check(root, "Tắt màn hình khi cả nhà vắng (đi làm, đi học)");
+        awayBox = new LinearLayout(this);
+        awayBox.setOrientation(LinearLayout.VERTICAL);
+        root.addView(awayBox, new LinearLayout.LayoutParams(-1, -2));
+        awayStart = new Slider(awayBox, "Vắng từ", 0, 23, 1, hour);
+        awayEnd = new Slider(awayBox, "Đến", 1, 24, 1, hour);
+        awayWeekdays = check(awayBox, "Chỉ thứ Hai đến thứ Sáu, trừ ngày nghỉ lễ");
+        note(awayBox, "Trong giờ này màn tắt khi không ai chạm, như ban đêm, và vẫy tay không bật màn để máy ngủ. "
+                + "Về sớm thì bấm nút nguồn. Hết giờ vắng, màn tự bật lại nếu chọn \"Tự bật màn hình\" ở mục dưới.");
+        awayEnabled.setOnCheckedChangeListener(new android.widget.CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
+                awayBox.setVisibility(on ? View.VISIBLE : View.GONE);
+                if (!loading && on && !AdminReceiver.isActive(SettingsActivity.this)) askAdmin();
+            }
+        });
+
+        section(root, "Pin");
+        batterySaver = check(root, "Tiết kiệm pin");
+        note(root, "Tải dữ liệu gom một lần mỗi 30 phút, đổi trang chậm hơn (ít nhất 1 phút), đồng hồ lật không chạy hiệu ứng. "
+                + "Hợp với máy pin yếu hoặc không cắm sạc.");
+        note(root, "Pin nóng từ " + Math.round(BatteryGuard.HOT_C) + "°C hoặc còn dưới " + BatteryGuard.LOW_PCT
+                + "% khi không sạc thì bảng lịch tự giảm sáng.");
+        batteryState = label(root, "");
+        batteryState.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+
         section(root, "Để lịch tự bật lại");
-        proximity = check(root, "Vẫy tay qua cảm biến tiệm cận để bật màn hình");
+        proximity = check(root, "Vẫy tay qua cảm biến tiệm cận để bật màn hình, trừ ban đêm");
         proximitySleep = check(root, "Che cảm biến khi màn đang sáng để tắt màn hình");
-        wakeMorning = check(root, "Tự bật màn hình lúc bắt đầu giờ ngày");
+        wakeMorning = check(root, "Tự bật màn hình lúc bắt đầu giờ ngày và khi hết giờ vắng nhà");
         autoStart = check(root, "Tự mở bảng lịch khi khởi động máy");
         note(root, sensorInfo());
+        note(root, "Ban đêm và giờ vắng nhà, vẫy tay không bật màn và cảm biến được tắt để máy ngủ, đỡ tốn pin. "
+                + "Muốn xem giờ thì chạm màn hình hoặc bấm nút nguồn.");
         label(root, "Quyền cần cấp (chạm dòng chưa có ✓)");
         if (Build.VERSION.SDK_INT >= 23) {
             statusRows.add(new StatusRow(root, "Hiện trên ứng dụng khác (để tự bật lại trên Android 10 trở lên)", new Runnable() {
@@ -690,6 +729,15 @@ public class SettingsActivity extends Activity implements Updater.Listener {
     // ------------------------------------------------------------------ nạp / lưu
 
     private void load() {
+        loading = true;
+        try {
+            loadValues();
+        } finally {
+            loading = false;
+        }
+    }
+
+    private void loadValues() {
         place.setText(prefs.placeName());
         placeState.setText(placeLabel());
         watchlist.setText(prefs.watchlistRaw());
@@ -732,6 +780,12 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         proximity.setChecked(prefs.proximityWake());
         proximitySleep.setChecked(prefs.proximitySleep());
         wakeMorning.setChecked(prefs.wakeMorning());
+        awayEnabled.setChecked(prefs.awayEnabled());
+        awayBox.setVisibility(prefs.awayEnabled() ? View.VISIBLE : View.GONE);
+        awayStart.set(prefs.awayStart());
+        awayEnd.set(prefs.awayEnd());
+        awayWeekdays.setChecked(prefs.awayWeekdaysOnly());
+        batterySaver.setChecked(prefs.batterySaver());
         autoStart.setChecked(prefs.autoStart());
         if (autoUpdate != null) autoUpdate.setChecked(prefs.autoUpdate());
     }
@@ -805,6 +859,11 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         prefs.putBool("proximity_sleep", proximitySleep.isChecked());
         prefs.putBool("wake_morning", wakeMorning.isChecked());
         prefs.putBool("auto_start", autoStart.isChecked());
+        prefs.putBool("away_enabled", awayEnabled.isChecked());
+        prefs.putInt("away_start", awayStart.get());
+        prefs.putInt("away_end", awayEnd.get());
+        prefs.putBool("away_weekdays", awayWeekdays.isChecked());
+        prefs.putBool("battery_saver", batterySaver.isChecked());
         if (autoUpdate != null) prefs.putBool("auto_update", autoUpdate.isChecked());
 
         if (!place.getText().toString().trim().equalsIgnoreCase(prefs.placeName())
@@ -1105,6 +1164,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
 
     private void refreshStates() {
         refreshPin();
+        refreshBattery();
         boolean admin = AdminReceiver.isActive(this);
         for (StatusRow r : statusRows) {
             String t = r.view.getText().toString().substring(3);
@@ -1130,6 +1190,29 @@ public class SettingsActivity extends Activity implements Updater.Listener {
             if (!updater.supported()) st = "Bản này không tự cập nhật.";
             updateState.setText(st);
         }
+    }
+
+    /** Pin hiện tại (đọc broadcast "dính", không cần đăng ký lâu dài) và thống kê 24 giờ qua. */
+    private void refreshBattery() {
+        int pct = -1;
+        boolean charging = false;
+        float temp = Float.NaN;
+        try {
+            Intent i = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            if (i != null) {
+                int level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+                int scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
+                pct = level < 0 || scale <= 0 ? -1 : Math.round(level * 100f / scale);
+                int status = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+                charging = i.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+                        || status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL;
+                int t = i.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Integer.MIN_VALUE);
+                temp = t == Integer.MIN_VALUE ? Float.NaN : t / 10f;
+            }
+        } catch (Throwable ignored) {
+        }
+        BatteryStats.Summary s = BatteryStats.get(this).summarize(System.currentTimeMillis());
+        batteryState.setText(BatteryStats.describe(s, pct, charging, temp));
     }
 
     @TargetApi(23)

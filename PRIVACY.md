@@ -6,7 +6,7 @@ Cập nhật: 04/11/2026. Áp dụng cho ứng dụng **Nhật Nguyệt** (tên 
 
 - Không tài khoản, không quảng cáo, không công cụ phân tích, không máy chủ trung gian.
 - Ứng dụng không thu thập hay gửi dữ liệu nào về cho tác giả.
-- Mọi cài đặt (nơi ở, ngày giỗ, mã PIN đã băm, trang hiển thị) chỉ lưu trên máy của bạn và bị xoá khi gỡ ứng dụng.
+- Mọi cài đặt (nơi ở, ngày giỗ, mã PIN đã băm, trang hiển thị) và thống kê pin 48 giờ gần nhất chỉ lưu trên máy của bạn, không gửi đi đâu, và bị xoá khi gỡ ứng dụng.
 - Dữ liệu hiển thị được tải thẳng từ các dịch vụ công khai liệt kê dưới đây. Mỗi lần tải, dịch vụ đó nhận địa chỉ IP của máy bạn như với mọi kết nối Internet.
 
 ## Dữ liệu gửi tới dịch vụ bên ngoài

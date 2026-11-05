@@ -11,6 +11,14 @@
 - Phím Back không thoát nhầm bảng lịch (bấm hai lần, hoặc Cài đặt > Nâng cao > Thoát); nhập sai PIN 5 lần phải chờ 30 giây.
 - Android 10 trở lên: dòng trạng thái nhắc cấp quyền "hiện trên ứng dụng khác" khi cần để tự bật lại; Cài đặt hiện ✓/✗ cho từng quyền.
 - Bỏ quyền vị trí chính xác và báo thức chính xác; dịch vụ cảm biến chỉ giữ CPU thức khi màn tắt.
+- Tiết kiệm pin cho máy cũ:
+  - Ban đêm mặc định tắt màn khi không ai chạm; lần đầu mở app mời cấp quyền quản trị để tắt hẳn, dòng trạng thái nhắc nếu chưa cấp.
+  - Ban đêm vẫy tay không bật màn, cảm biến tiệm cận được tắt để máy ngủ.
+  - Giờ vắng nhà: tắt màn trong giờ cả nhà đi làm, đi học; mặc định chỉ thứ Hai đến thứ Sáu và bỏ qua ngày nghỉ lễ; hết giờ vắng màn tự bật lại.
+  - Pin nóng từ 42°C hoặc còn dưới 20% khi không sạc thì tự giảm sáng.
+  - Chế độ Tiết kiệm pin: tải dữ liệu gom một lần mỗi 30 phút, đổi trang ít nhất 1 phút, đồng hồ lật không chạy hiệu ứng.
+  - Thống kê pin trong Cài đặt: tụt bao nhiêu %/giờ khi màn sáng, màn tắt, sạc nhanh cỡ nào, nóng nhất 24 giờ qua.
+- Sửa lỗi mở Cài đặt là bị hỏi cấp quyền quản trị dù không chọn gì.
 - Tiết khí có hiệu chỉnh chương động; sửa hai ngày xa (2054, 2062) bị tính sai tháng âm.
 - Thêm giấy phép Apache 2.0, NOTICE, chính sách quyền riêng tư; ghi công Open-Meteo, OpenStreetMap trong app.
 - Thư viện Conscrypt 2.5.3 (căn trang 16 KB). Thêm bản "store" (Android 7+, không tự cập nhật) cho F-Droid/Google Play.

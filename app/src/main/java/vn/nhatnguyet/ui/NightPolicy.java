@@ -3,7 +3,7 @@ package vn.nhatnguyet.ui;
 import vn.nhatnguyet.Prefs;
 
 /**
- * Quyết định màn hình theo giờ ngày/đêm và mức rảnh: giữ sáng hay không, độ sáng bao nhiêu,
+ * Quyết định màn hình theo giờ ngày/đêm, giờ vắng nhà và mức rảnh: giữ sáng hay không, độ sáng bao nhiêu,
  * có cần tắt hẳn (quản trị thiết bị) hay không. Thuần Java để kiểm thử được; MainActivity chỉ áp dụng.
  */
 public final class NightPolicy {
@@ -13,7 +13,7 @@ public final class NightPolicy {
 
     public final boolean keepOn;
     public final float brightness;
-    /** Đêm, chế độ tắt hẳn, đã hết thời gian rảnh: gọi lockNow() một lần. */
+    /** Hết thời gian rảnh lúc cần tắt màn (đêm chế độ tắt, hoặc giờ vắng nhà): gọi lockNow() một lần. */
     public final boolean lockNow;
 
     NightPolicy(boolean keepOn, float brightness, boolean lockNow) {
@@ -22,42 +22,68 @@ public final class NightPolicy {
         this.lockNow = lockNow;
     }
 
-    /**
-     * @param night         ngoài giờ ngày (và không bật "luôn sáng")
-     * @param mode          Prefs.NIGHT_DIM / NIGHT_TIMEOUT / NIGHT_OFF
-     * @param idleMs        thời gian từ lần tương tác cuối
-     * @param idleLimitMs   ngưỡng rảnh ban đêm
-     * @param dayPercent    độ sáng ngày 0..100, 0 = theo máy
-     * @param nightPercent  độ sáng đêm 1..100
-     * @param livePercent   độ sáng đang kéo tay (>0) hoặc -1
-     * @param blackout      đang phủ đen chờ máy tự tắt
-     * @param lockedAlready đã gọi lockNow trong đợt rảnh này
-     */
-    public static NightPolicy decide(boolean night, String mode, long idleMs, long idleLimitMs,
-                                     int dayPercent, int nightPercent, int livePercent,
-                                     boolean blackout, boolean lockedAlready) {
+    /** Các giá trị đầu vào; dùng lớp này để lời gọi đọc được thay vì hàm chục tham số. */
+    public static final class Input {
+        /** Ngoài giờ ngày (và không bật "luôn sáng"). */
+        public boolean night;
+        /** Đang trong giờ vắng nhà: tắt màn khi không ai chạm, kể cả ban ngày. */
+        public boolean away;
+        /** Prefs.NIGHT_DIM / NIGHT_TIMEOUT / NIGHT_OFF. */
+        public String mode = Prefs.NIGHT_OFF;
+        public long idleMs;
+        public long idleLimitMs;
+        /** Độ sáng ngày 0..100, 0 = theo máy. */
+        public int dayPercent;
+        /** Độ sáng đêm 1..100. */
+        public int nightPercent = 15;
+        /** Độ sáng đang kéo tay (>0) hoặc -1. */
+        public int livePercent = -1;
+        /** Trần độ sáng khi pin nóng hoặc yếu (1..100), 0 = không giới hạn. */
+        public int capPercent;
+        /** Đang phủ đen chờ máy tự tắt. */
+        public boolean blackout;
+        /** Đã gọi lockNow trong đợt rảnh này. */
+        public boolean lockedAlready;
+    }
+
+    public static NightPolicy decide(Input in) {
         boolean keepOn;
         float bright;
         boolean lock = false;
-        if (!night) {
+        boolean active = in.idleMs < in.idleLimitMs;
+        float day = in.dayPercent <= 0 ? BRIGHT_SYSTEM : Math.min(1f, in.dayPercent / 100f);
+        if (in.away) {
+            // Giờ vắng nhà: có người chạm thì sáng như ban ngày, rảnh thì tắt bất kể chế độ đêm.
+            keepOn = active;
+            bright = in.night ? nightBright(in) : day;
+            lock = !active && !in.lockedAlready;
+        } else if (!in.night) {
             keepOn = true;
-            bright = dayPercent <= 0 ? BRIGHT_SYSTEM : Math.min(1f, dayPercent / 100f);
+            bright = day;
         } else {
-            bright = Math.max(0.01f, Math.min(1f, nightPercent / 100f));
-            boolean active = idleMs < idleLimitMs;
-            if (Prefs.NIGHT_DIM.equals(mode) || active) {
+            bright = nightBright(in);
+            if (Prefs.NIGHT_DIM.equals(in.mode) || active) {
                 keepOn = true;
             } else {
                 keepOn = false;
-                lock = Prefs.NIGHT_OFF.equals(mode) && !lockedAlready;
+                lock = Prefs.NIGHT_OFF.equals(in.mode) && !in.lockedAlready;
             }
         }
-        if (livePercent > 0) bright = livePercent / 100f;
-        if (blackout) {
+        if (in.livePercent > 0) {
+            bright = in.livePercent / 100f;
+        } else if (in.capPercent > 0) {
+            float cap = in.capPercent / 100f;
+            bright = bright == BRIGHT_SYSTEM ? cap : Math.min(bright, cap);
+        }
+        if (in.blackout) {
             keepOn = false;
             bright = BRIGHT_OFF;
             lock = false;
         }
         return new NightPolicy(keepOn, bright, lock);
+    }
+
+    private static float nightBright(Input in) {
+        return Math.max(0.01f, Math.min(1f, in.nightPercent / 100f));
     }
 }

@@ -46,7 +46,8 @@ Không cần tài khoản, không quảng cáo, không qua máy chủ trung gian
 - **Thời tiết theo vị trí.** Lần đầu mở app hỏi nơi ở; sau đó gõ tên thành phố hoặc bấm *Dùng vị trí hiện tại* (vị trí qua Wi‑Fi, cấp thành phố là đủ). Kèm chất lượng không khí (AQI, bụi mịn PM2.5, tô màu theo mức) và dòng nhắc "Sắp mưa khoảng 15h" từ dự báo theo giờ.
 - **Ngày giỗ, sinh nhật.** Thêm bằng hộp thoại hoặc ghi mỗi dòng một ngày theo âm hoặc dương lịch (vd. `15/8 âm Giỗ ông nội`, ghi kèm năm cũng được). Bảng lịch nhắc trước 7 ngày, tờ lịch ghi tên ngày, lịch tháng đánh dấu chấm đỏ; ngày 30 âm rơi vào tháng thiếu thì tính là ngày 29, ngày 29/2 dương ở năm không nhuận tính là 28/2.
 - **Khoá Cài đặt.** Đặt mã PIN để người khác không đổi được cài đặt khi máy treo ở nơi chung. Phím Back không thoát nhầm bảng lịch.
-- **Ngày và đêm.** Giờ ngày màn hình luôn sáng. Ban đêm chọn giảm sáng, tắt theo thời gian chờ hoặc tắt hẳn; chữ chuyển tông ấm để bớt ánh sáng xanh. Vẫy tay qua cảm biến tiệm cận để bật màn, che cảm biến khi màn đang sáng để tắt; tự bật lúc sáng, chống lưu ảnh.
+- **Ngày và đêm.** Giờ ngày màn hình luôn sáng. Ban đêm mặc định tắt màn khi không ai chạm (cấp quyền quản trị thiết bị để tắt hẳn), hoặc chọn chỉ giảm sáng; chữ chuyển tông ấm để bớt ánh sáng xanh. Vẫy tay qua cảm biến tiệm cận để bật màn (trừ ban đêm và giờ vắng nhà, lúc đó cảm biến nghỉ để máy ngủ), che cảm biến khi màn đang sáng để tắt; tự bật lúc sáng, chống lưu ảnh.
+- **Tiết kiệm pin cho máy cũ.** Giờ vắng nhà tắt màn trong giờ cả nhà đi làm, đi học (mặc định chỉ ngày thường, bỏ qua ngày nghỉ lễ). Pin nóng từ 42°C hoặc dưới 20% khi không sạc thì tự giảm sáng. Chế độ *Tiết kiệm pin* gom các lần tải dữ liệu về mỗi 30 phút, đổi trang chậm hơn, bỏ hiệu ứng lật. Cài đặt có thống kê pin: tụt bao nhiêu %/giờ khi màn sáng, màn tắt, sạc nhanh cỡ nào, nóng nhất 24 giờ qua; dùng số này để đặt lịch cho ổ cắm hẹn giờ.
 - **Chạy được ngoại tuyến.** Dữ liệu được lưu lại; mất mạng vẫn hiện số liệu gần nhất kèm nhãn "dữ liệu cũ".
 - **Canh giờ máy.** So với giờ của các máy chủ dữ liệu; giờ máy lệch từ 2 phút (hay bị về năm cũ khi hết pin) thì dòng trạng thái báo, chạm để mở cài đặt ngày giờ.
 - **Tự cập nhật** (bản GitHub). Tải bản mới từ GitHub Releases, kiểm tra SHA-256 và tên gói trước khi cài.
@@ -153,8 +154,9 @@ app/src/main/java/vn/nhatnguyet/
   net/      Tls (Conscrypt + kho chứng chỉ gốc), Http, ClockCheck (phát hiện giờ máy lệch)
   lunar/    Lunar (âm lịch, can chi, tiết khí, hoàng đạo, ngày lễ), LunarDate, PersonalDays (ngày giỗ, sinh nhật)
   data/     DataHub (lịch tải, bộ nhớ đệm), các nguồn Weather, Gold, Fuel, Fx, Stock, News; Html, J (tiện ích đọc)
-  ui/       MainActivity (bảng lịch), NightPolicy (chính sách màn hình ngày/đêm), Pages, SettingsActivity, các view tự vẽ
-  sys/      WakeService + ProximityGesture (cảm biến tiệm cận), Screen, BootReceiver, Scheduler, ScheduleReceiver, AdminReceiver
+  ui/       MainActivity (bảng lịch), NightPolicy (chính sách màn hình ngày/đêm/vắng nhà), Pages, SettingsActivity, các view tự vẽ
+  sys/      WakeService + ProximityGesture (cảm biến tiệm cận), Screen, BootReceiver, Scheduler, ScheduleReceiver, AdminReceiver,
+            BatteryGuard (giảm sáng khi pin nóng/yếu), BatteryStats (thống kê pin)
   update/   Updater, SessionInstall, InstallReceiver (chỉ flavor github)
 app/src/store/AndroidManifest.xml   flavor store gỡ quyền cài gói
 ```
@@ -163,7 +165,7 @@ Luồng dữ liệu: `Source.fetch()` chạy trên pool 2 luồng, kết quả v
 
 ## Đã kiểm thử
 
-- Kiểm thử đơn vị (45 ca): âm lịch (Tết 2020–2033 và 1985, tháng nhuận 2023 và 2025, mùng 2 mùng 3 Tết, Giao thừa, tiết khí sát nửa đêm, hai ngày xa 2054 và 2062, đổi qua lại 1990–2060), ngày giỗ (kèm năm, 29/2), dãy giờ dự báo theo giờ hiện tại, định dạng số, cử chỉ cảm biến, bộ đọc giá vàng, xăng dầu, tỷ giá, thời tiết và RSS trên dữ liệu thật. Chưa có test giao diện.
+- Kiểm thử đơn vị (63 ca): âm lịch (Tết 2020–2033 và 1985, tháng nhuận 2023 và 2025, mùng 2 mùng 3 Tết, Giao thừa, Ngày Văn hóa Việt Nam, tiết khí sát nửa đêm, hai ngày xa 2054 và 2062, đổi qua lại 1990–2060), ngày giỗ (kèm năm, 29/2), dãy giờ dự báo theo giờ hiện tại, định dạng số, cử chỉ cảm biến, chính sách màn hình ngày/đêm/vắng nhà, giảm sáng khi pin nóng hoặc yếu, thống kê pin, lịch báo thức bật màn, gom mốc tải ở chế độ tiết kiệm pin, bộ đọc giá vàng, xăng dầu, tỷ giá, thời tiết và RSS trên dữ liệu thật. Chưa có test giao diện.
 - Máy ảo Android 4.1.2 (API 16): cài APK ký v1, TLS qua Conscrypt, tải đủ các nguồn dữ liệu, font tiếng Việt, xoay trang, vẫy tay bật màn và trọn quy trình tự cập nhật.
 - Bố cục dựng thử ở 480×320 dp (3,5"), 640×360 dp (5,5") và 915×411 dp (6,7").
 - Chưa thử trên máy thật Android 4.0.3 và máy 6,7" thật.
@@ -172,7 +174,7 @@ Luồng dữ liệu: `Source.fetch()` chạy trên pool 2 luồng, kết quả v
 
 - vang.today, giaxanghomnay.com và Entrade/DNSE là nguồn không chính thức, có thể thay đổi bất cứ lúc nào.
 - Nhiều máy đời mới chỉ bật cảm biến tiệm cận khi đang gọi, nên vẫy tay có thể không đánh thức được màn hình đã tắt.
-- Điện thoại cũ cắm sạc liên tục dễ phồng pin: giữ độ sáng đêm thấp và thỉnh thoảng kiểm tra máy. Dòng trạng thái cảnh báo khi pin nóng từ 45°C.
+- Điện thoại cũ cắm sạc liên tục dễ phồng pin. Ứng dụng không tự ngắt sạc được (Android không cho phép nếu máy chưa root). Nên để máy chỗ thoáng, tháo ốp, giữ ban đêm tắt màn, và cân nhắc ổ cắm hẹn giờ hoặc tính năng giới hạn sạc của hãng nếu máy có. Bảng lịch tự giảm sáng và báo khi pin nóng từ 42°C.
 
 ## Giấy phép
 
