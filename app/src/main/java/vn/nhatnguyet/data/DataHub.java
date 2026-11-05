@@ -32,6 +32,8 @@ public final class DataHub {
     private static final long TICK_MS = 15_000L;
     /** nextAt = 0: chưa hẹn (dùng hạn của bộ nhớ đệm); FORCE: tải ngay. */
     private static final long FORCE = -1L;
+    /** Chế độ tiết kiệm pin: mọi nguồn tải cùng lúc ở các mốc :00 và :30, ít nhất 30 phút một lần. */
+    static final long SAVER_MS = 30 * 60_000L;
 
     public interface Listener {
         void onSectionChanged(String key);
@@ -116,7 +118,29 @@ public final class DataHub {
         Entry e = entries.get(key);
         Source s = sources.get(key);
         if (e == null || s == null || e.data == null) return false;
-        return System.currentTimeMillis() - e.at > s.staleMs(prefs);
+        long stale = s.staleMs(prefs);
+        if (prefs.batterySaver()) stale = Math.max(stale, 3 * SAVER_MS);
+        return System.currentTimeMillis() - e.at > stale;
+    }
+
+    /** Chu kỳ làm mới thực tế của nguồn (chế độ tiết kiệm pin kéo dài tối thiểu 30 phút). */
+    private long interval(Source s) {
+        long i = s.intervalMs(prefs);
+        return prefs.batterySaver() ? Math.max(i, SAVER_MS) : i;
+    }
+
+    /** Lần tải kế tiếp sau lần tải lúc at. Tiết kiệm pin: dồn về mốc 30 phút để sóng mạng chỉ thức một lần. */
+    private long nextAfter(Source s, long at) {
+        return prefs.batterySaver() ? alignedNext(at, s.intervalMs(prefs)) : at + interval(s);
+    }
+
+    /**
+     * Mốc :00/:30 sớm nhất mà vẫn cách lần tải trước ít nhất (chu kỳ − 30 phút) và sau thời điểm đó;
+     * nguồn chu kỳ ngắn (≤ 30 phút) tải ở mốc kế tiếp, nguồn 1 giờ tải cách mốc 30–60 phút.
+     */
+    static long alignedNext(long at, long intervalMs) {
+        long earliest = at + Math.max(intervalMs, SAVER_MS) - SAVER_MS + 1;
+        return ((earliest + SAVER_MS - 1) / SAVER_MS) * SAVER_MS;
     }
 
     public void addListener(Listener l) {
@@ -141,12 +165,36 @@ public final class DataHub {
 
     /** Tải lại ngay mọi nguồn (người dùng bấm dòng trạng thái). */
     public void refreshAll() {
-        for (Entry e : entries.values()) e.nextAt = FORCE;
+        if (!onMain()) {
+            main.post(new Runnable() {
+                @Override
+                public void run() {
+                    refreshAll();
+                }
+            });
+            return;
+        }
+        long now = System.currentTimeMillis();
+        for (Source s : sources.values()) {
+            Entry e = entries.get(s.key);
+            // Nguồn có giới hạn tần suất (vd. Vietcombank) không được ép tải sớm hơn.
+            if (e.data != null && now - e.at < s.minGapMs(prefs)) continue;
+            e.nextAt = FORCE;
+        }
         check();
     }
 
-    /** Gọi sau khi đổi cài đặt (thành phố, mã CK, RSS…). */
+    /** Gọi sau khi đổi cài đặt (thành phố, mã CK, RSS…). Gọi được từ luồng bất kỳ. */
     public void settingsChanged() {
+        if (!onMain()) {
+            main.post(new Runnable() {
+                @Override
+                public void run() {
+                    settingsChanged();
+                }
+            });
+            return;
+        }
         for (Source s : sources.values()) {
             Entry e = entries.get(s.key);
             String cfg = s.configKey(prefs);
@@ -162,6 +210,10 @@ public final class DataHub {
         check();
     }
 
+    private static boolean onMain() {
+        return Looper.myLooper() == Looper.getMainLooper();
+    }
+
     private void check() {
         long now = System.currentTimeMillis();
         for (final Source s : sources.values()) {
@@ -172,9 +224,14 @@ public final class DataHub {
                 e.config = null;
                 e.nextAt = FORCE;
             }
-            if (e.nextAt == 0 && e.data != null && e.error == null && now - e.at < s.intervalMs(prefs) && now >= e.at) {
+            if (e.nextAt == 0 && e.data != null && e.error == null && now < nextAfter(s, e.at) && now >= e.at) {
                 // Dữ liệu từ bộ nhớ đệm còn mới: hẹn lần tải kế tiếp.
-                e.nextAt = e.at + s.intervalMs(prefs);
+                e.nextAt = nextAfter(s, e.at);
+            }
+            if (e.data != null && e.error == null && e.nextAt > 0) {
+                // Chu kỳ có thể ngắn lại (vd. chứng khoán vừa mở cửa, tắt tiết kiệm pin): không chờ hết chu kỳ cũ.
+                long due = nextAfter(s, e.at);
+                if (e.nextAt > due) e.nextAt = Math.max(due, e.at + s.minGapMs(prefs));
             }
             if (now < e.nextAt) continue;
             load(s, e);
@@ -225,13 +282,15 @@ public final class DataHub {
             e.error = null;
             e.fails = 0;
             e.config = cfg;
-            e.nextAt = now + s.intervalMs(prefs);
+            e.nextAt = nextAfter(s, now);
         } else {
             e.error = Http.describe(err);
             e.errorAt = now;
             e.fails++;
-            long retry = Math.min(s.intervalMs(prefs), 60_000L * (1L << Math.min(e.fails - 1, 4)));
-            e.nextAt = now + Math.max(30_000L, retry);
+            long retry = Math.min(interval(s), 60_000L * (1L << Math.min(e.fails - 1, 4)));
+            e.nextAt = now + Math.max(Math.max(30_000L, s.minGapMs(prefs)), retry);
+            // Tiết kiệm pin: thử lại cùng đợt tải kế tiếp thay vì đánh thức mạng riêng.
+            if (prefs.batterySaver()) e.nextAt = Math.max(e.nextAt, alignedNext(now, SAVER_MS));
         }
         notifyChanged(s.key);
     }

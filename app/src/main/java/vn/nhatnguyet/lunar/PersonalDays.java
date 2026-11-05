@@ -5,11 +5,17 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Đọc danh sách ngày riêng, mỗi dòng một ngày: "15/8 âm Giỗ ông nội" hoặc "20/11 Sinh nhật mẹ". */
+/**
+ * Đọc danh sách ngày riêng, mỗi dòng một ngày: "15/8 âm Giỗ ông nội" hoặc "20/11 Sinh nhật mẹ".
+ * Chấp nhận cả năm ("15/8/2010 âm Giỗ ông") và chữ âm trong ngoặc ("15/8 (âm) Giỗ bà"); năm bị bỏ qua.
+ */
 public final class PersonalDays {
     private static final Pattern LINE = Pattern.compile(
-            "(\\d{1,2})\\s*[/.-]\\s*(\\d{1,2})\\s*(?:(âm lịch|am lich|âm|am|âl|al)(?=[\\s:,.–-]|$))?\\s*[:,.–-]?\\s*(.*)",
+            "(\\d{1,2})\\s*[/.-]\\s*(\\d{1,2})(?:\\s*[/.-]\\s*\\d{2,4})?\\s*"
+                    + "(?:[(\\[]?(âm lịch|am lich|âm|am|âl|al)[)\\]]?(?=[\\s:,.–-]|$))?\\s*[:,.–-]?\\s*(.*)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+    /** Tên bắt đầu bằng dấu phân cách hoặc chữ số là dấu hiệu dòng ghi sai (vd. năm thừa, ngày lặp). */
+    private static final Pattern BAD_NAME = Pattern.compile("^[/.\\-\\d].*");
     private static final int[] SOLAR_DAYS = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
     private PersonalDays() {}
@@ -30,7 +36,9 @@ public final class PersonalDays {
                 boolean lunar = m.group(3) != null;
                 String name = m.group(4).trim();
                 boolean valid = month >= 1 && month <= 12 && day >= 1 && day <= (lunar ? 30 : SOLAR_DAYS[month - 1]);
-                if (valid && name.length() > 0) h = Lunar.Holiday.personal(name, lunar, day, month);
+                if (valid && name.length() > 0 && !BAD_NAME.matcher(name).matches()) {
+                    h = Lunar.Holiday.personal(name, lunar, day, month);
+                }
             }
             if (h != null) out.add(h);
             else if (bad != null) bad.add(i + 1);

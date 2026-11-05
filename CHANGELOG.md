@@ -1,5 +1,37 @@
 # Nhật ký thay đổi
 
+## 1.0.2
+
+- Lần đầu mở app hỏi nơi ở để thời tiết đúng chỗ ngay; màn Cài đặt gọn hơn, phần ít dùng gom vào "Nâng cao".
+- Màn Cài đặt: mục lục bên trái trên màn ngang rộng (chạm để nhảy tới mục); xếp lại theo mức hay dùng (Nơi ở, Màn hình, Ngày giỗ, Ngày và đêm, Tự bật lại, Pin); chọn báo và mã chứng khoán chỉ hiện khi bật trang tương ứng; giờ ngày, giờ vắng chọn bằng ô bấm thay cho thanh trượt; trang và báo xếp hai cột; danh sách quyền chỉ hiện quyền tính năng đang bật cần, kèm số quyền còn thiếu; bớt ghi chú lặp. Trang dài còn khoảng hai phần ba so với trước.
+- Cột đồng hồ gọn hơn: ba khối giờ, âm lịch, thời tiết; bỏ dòng can chi, "ngày hoàng đạo", độ ẩm, dự báo theo giờ và "vừa cập nhật" (đã có ở trang bên phải; bật lại trong Nâng cao). Không khí chỉ hiện khi từ mức kém.
+- Đồng hồ lật: nút Cài đặt chuyển xuống góc dưới cạnh pin, không còn đè lên thẻ phút trên màn 3,5"; thêm dòng nhắc ngày giỗ, sinh nhật (trước một tuần), ngày lễ, ngày nghỉ, mùng 1, rằm sắp tới (chỉ hiện khi có, thẻ lật tự nhường chỗ); dòng ngày và âm lịch tự rút gọn vừa bề ngang thay vì luôn bỏ năm trên màn hẹp; báo sắp mưa tô màu; bỏ tên nơi ở ở dòng cuối. Tắt dòng thông tin thì không tải thời tiết cho đỡ pin.
+- Sửa dòng đếm ngược trên màn hẹp bị rút thành tên ngày lễ, dễ tưởng là hôm nay; giờ luôn giữ "còn N ngày" hoặc ngày dương.
+- Trang Tin tức chọn báo bằng ô tick; mặc định chỉ bật Tờ lịch, Lịch tháng, Thời tiết, Vàng, Xăng dầu.
+- Thêm ngày giỗ bằng hộp thoại; nhận cả dòng ghi kèm năm ("15/8/2010 âm Giỗ ông") và "(âm)".
+- Thêm Ngày Văn hóa Việt Nam 24/11 (ngày nghỉ hưởng lương từ năm 2026 theo Nghị quyết 28/2026/QH16), tô đỏ và đếm ngược như các ngày lễ lớn. Mùng 2, mùng 3 Tết và Giao thừa là ngày lễ; ngày 29/2 dương lịch được nhắc vào 28/2 ở năm không nhuận.
+- Sửa lỗi có thể làm app đóng khi bấm "Dùng vị trí hiện tại" rồi quay lại ngay.
+- Dãy giờ dự báo và dòng "Sắp mưa" tính theo giờ hiện tại kể cả khi mất mạng; chứng khoán tải ngay khi mở cửa.
+- Phím Back không thoát nhầm bảng lịch (bấm hai lần, hoặc Cài đặt > Nâng cao > Thoát); nhập sai PIN 5 lần phải chờ 30 giây.
+- Android 10 trở lên: dòng trạng thái nhắc cấp quyền "hiện trên ứng dụng khác" khi cần để tự bật lại; Cài đặt hiện ✓/✗ cho từng quyền.
+- Bỏ quyền vị trí chính xác và báo thức chính xác; dịch vụ cảm biến chỉ giữ CPU thức khi màn tắt.
+- Tiết kiệm pin cho máy cũ:
+  - Ban đêm mặc định tắt màn khi không ai chạm; lần đầu mở app mời cấp quyền quản trị để tắt hẳn, dòng trạng thái nhắc nếu chưa cấp.
+  - Ban đêm vẫy tay không bật màn, cảm biến tiệm cận được tắt để máy ngủ.
+  - Giờ vắng nhà: tắt màn trong giờ cả nhà đi làm, đi học; mặc định chỉ thứ Hai đến thứ Sáu và bỏ qua ngày nghỉ lễ; hết giờ vắng màn tự bật lại.
+  - Pin nóng từ 42°C hoặc còn dưới 20% khi không sạc thì tự giảm sáng.
+  - Chế độ Tiết kiệm pin: tải dữ liệu gom một lần mỗi 30 phút, đổi trang ít nhất 1 phút, đồng hồ lật không chạy hiệu ứng.
+  - Thống kê pin trong Cài đặt: tụt bao nhiêu %/giờ khi màn sáng, màn tắt, sạc nhanh cỡ nào, nóng nhất 24 giờ qua.
+- Sửa lỗi mở Cài đặt là bị hỏi cấp quyền quản trị dù không chọn gì.
+- Ngày nghỉ theo pháp luật Việt Nam (Bộ luật Lao động 2019 Điều 111, 112; Nghị quyết 28/2026/QH16):
+  - Lịch tháng và tờ lịch chỉ tô đỏ ngày được nghỉ; ngày kỷ niệm không nghỉ như 8/3, 20/10, 20/11, Trung thu, Giáng sinh, Valentine chỉ ghi tên.
+  - Thêm ngày nghỉ bù khi ngày lễ trùng thứ Bảy, Chủ nhật, ngày nghỉ Tết và ngày liền kề Quốc khánh theo lịch khối nhà nước đã công bố cho 2026 và 2027, kể cả ngày hoán đổi và thứ Bảy làm bù.
+  - Bảng lịch ghi "Hôm nay: Nghỉ bù …", "Nghỉ Tết Nguyên đán", "Nghỉ hoán đổi".
+  - Giờ vắng nhà theo đúng lịch nghỉ này.
+- Tiết khí có hiệu chỉnh chương động; sửa hai ngày xa (2054, 2062) bị tính sai tháng âm.
+- Thêm giấy phép Apache 2.0, NOTICE, chính sách quyền riêng tư; ghi công Open-Meteo, OpenStreetMap trong app.
+- Thư viện Conscrypt 2.5.3 (căn trang 16 KB). Thêm bản "store" (Android 7+, không tự cập nhật) cho F-Droid/Google Play.
+
 ## 1.0.1
 
 - Vuốt lên hoặc xuống trên đồng hồ để chỉnh độ sáng, có thanh báo phần trăm.

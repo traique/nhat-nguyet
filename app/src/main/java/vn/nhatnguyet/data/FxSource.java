@@ -34,6 +34,12 @@ public final class FxSource extends Source {
         return 12 * 3600_000L;
     }
 
+    /** Vietcombank ghi ngay trong XML: "Only one request every 5 minutes". */
+    @Override
+    public long minGapMs(Prefs prefs) {
+        return 5 * 60_000L;
+    }
+
     @Override
     public JSONObject fetch(Context context, Prefs prefs) throws Exception {
         return parse(Http.get("https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx"));

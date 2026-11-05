@@ -21,6 +21,12 @@ final class ProximityGesture {
     private long nearAt;
     private long wokeAt = -60_000L;
 
+    /** Cảm biến vừa tắt rồi bật lại: quên trạng thái che dở dang. */
+    void reset() {
+        lastNear = false;
+        coverWhileAwake = false;
+    }
+
     int onSample(boolean near, long now, boolean awake) {
         int action = NONE;
         if (near && !lastNear) {

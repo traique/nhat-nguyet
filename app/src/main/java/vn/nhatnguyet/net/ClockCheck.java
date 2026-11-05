@@ -26,7 +26,8 @@ public final class ClockCheck {
         return best;
     }
 
-    static synchronized void reset() {
+    /** Gọi khi người dùng chỉnh giờ máy: bỏ các mẫu đo cũ. */
+    public static synchronized void reset() {
         count = 0;
         next = 0;
     }

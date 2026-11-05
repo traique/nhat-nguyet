@@ -102,6 +102,57 @@ public class LunarTest {
     }
 
     @Test
+    public void tetHolidaysCoverThreeDaysAndNewYearsEve() {
+        // Tết Bính Ngọ: mùng 1 là 17/2/2026; tháng Chạp Ất Tỵ thiếu nên 29 Tết (16/2/2026) là Giao thừa.
+        assertEquals("Tết Nguyên đán", Lunar.holidayOn(17, 2, Lunar.solarToLunar(17, 2, 2026)).name);
+        assertEquals("Mùng 2 Tết", Lunar.holidayOn(18, 2, Lunar.solarToLunar(18, 2, 2026)).name);
+        assertEquals("Mùng 3 Tết", Lunar.holidayOn(19, 2, Lunar.solarToLunar(19, 2, 2026)).name);
+        assertNull(Lunar.holidayOn(20, 2, Lunar.solarToLunar(20, 2, 2026)));
+        assertEquals("Giao thừa", Lunar.holidayOn(16, 2, Lunar.solarToLunar(16, 2, 2026)).name);
+        // Tháng Chạp Giáp Thìn thiếu (29 ngày): 29 Tết 28/1/2025 tính là Giao thừa.
+        assertEquals("Giao thừa", Lunar.holidayOn(28, 1, Lunar.solarToLunar(28, 1, 2025)).name);
+        assertTrue(Lunar.isTet(Lunar.holidayOn(18, 2, Lunar.solarToLunar(18, 2, 2026))));
+        assertFalse(Lunar.isTet(Lunar.HOLIDAYS[0]));
+    }
+
+    @Test
+    public void vietnamCultureDayFrom2026() {
+        Lunar.Holiday h = Lunar.holidayOn(24, 11, Lunar.solarToLunar(24, 11, 2026));
+        assertEquals("Ngày Văn hóa Việt Nam", h.name);
+        assertTrue("ngày nghỉ hưởng lương như 30/4, 2/9", h.major);
+        assertEquals("Ngày Văn hóa Việt Nam", Lunar.holidayOn(24, 11, Lunar.solarToLunar(24, 11, 2030)).name);
+        // Trước khi có Nghị quyết 28/2026/QH16 thì không phải ngày lễ.
+        assertNull(Lunar.holidayOn(24, 11, Lunar.solarToLunar(24, 11, 2025)));
+        // Bảng lịch đếm ngược lễ lớn: từ 1/11/2026 thì lễ lớn kế tiếp là 24/11.
+        List<Lunar.Upcoming> up = Lunar.upcoming(1, 11, 2026, 1, true);
+        assertEquals("Ngày Văn hóa Việt Nam", up.get(0).holiday.name);
+        assertEquals(23, up.get(0).days);
+    }
+
+    @Test
+    public void solarTermsNearMidnight() {
+        // Bạch lộ 2014 bắt đầu 00:01 ngày 8/9 giờ VN: không có hiệu chỉnh chương động sẽ lệch sang 7/9.
+        assertTrue(Lunar.solarTermStarts(Lunar.jdFromDate(8, 9, 2014)));
+        assertFalse(Lunar.solarTermStarts(Lunar.jdFromDate(7, 9, 2014)));
+        // Sương giáng 2019: 24/10.
+        assertTrue(Lunar.solarTermStarts(Lunar.jdFromDate(24, 10, 2019)));
+        assertFalse(Lunar.solarTermStarts(Lunar.jdFromDate(23, 10, 2019)));
+    }
+
+    @Test
+    public void farDatesStillConvert() {
+        // Hai ngày từng trả về ngày âm 0 vì ước lượng tháng lệch quá một bước.
+        for (int[] d : new int[][]{{7, 5, 2054}, {9, 4, 2062}}) {
+            LunarDate ld = Lunar.solarToLunar(d[0], d[1], d[2]);
+            assertTrue(ld.day >= 1 && ld.day <= 30);
+            assertArrayEquals(d, Lunar.lunarToSolar(ld.day, ld.month, ld.year, ld.leap));
+        }
+        // 2030: sóc lúc 23:08 giờ Việt Nam ngày 2/2 nên Tết là 2/2 (Trung Quốc 3/2).
+        assertTet(2030, 2, 2, 2030);
+        assertTet(2033, 31, 1, 2033);
+    }
+
+    @Test
     public void tetCountdown() {
         assertEquals(1, Lunar.daysToTet(16, 2, 2026));
         assertEquals(0, Lunar.daysToTet(17, 2, 2026));

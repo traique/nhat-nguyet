@@ -8,7 +8,9 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
+import android.content.BroadcastReceiver;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ServiceInfo;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -21,6 +23,8 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import android.util.Log;
+
+import java.util.Calendar;
 
 import vn.nhatnguyet.Prefs;
 import vn.nhatnguyet.R;
@@ -48,6 +52,8 @@ public class WakeService extends Service implements SensorEventListener {
     private Sensor proximity;
     private PowerManager power;
     private PowerManager.WakeLock cpuLock;
+    private boolean listening;
+    private static final long RECHECK_MS = 10 * 60_000L;
     private Prefs prefs;
     private final ProximityGesture gesture = new ProximityGesture();
 
@@ -93,20 +99,80 @@ public class WakeService extends Service implements SensorEventListener {
         }
         cpuLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "nhatnguyet:proximity");
         cpuLock.setReferenceCounted(false);
-        cpuLock.acquire();
-        sensors.registerListener(this, proximity, SensorManager.SENSOR_DELAY_NORMAL);
+        IntentFilter f = new IntentFilter(Intent.ACTION_SCREEN_ON);
+        f.addAction(Intent.ACTION_SCREEN_OFF);
+        registerReceiver(screenReceiver, f);
+        syncState();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        syncState();
         return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
+        main.removeCallbacks(recheck);
         if (sensors != null) sensors.unregisterListener(this);
+        listening = false;
+        try {
+            unregisterReceiver(screenReceiver);
+        } catch (Throwable ignored) {
+        }
         if (cpuLock != null && cpuLock.isHeld()) cpuLock.release();
         super.onDestroy();
+    }
+
+    private final BroadcastReceiver screenReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            syncState();
+        }
+    };
+
+    /** Đang giữ CPU thức lúc màn tắt: xem lại định kỳ để thôi giữ khi vào đêm. */
+    private final Runnable recheck = new Runnable() {
+        @Override
+        public void run() {
+            syncState();
+        }
+    };
+
+    /** Vẫy tay bật màn chỉ có hiệu lực ngoài giờ đêm và giờ vắng nhà (lúc đó nghỉ để máy ngủ, đỡ tốn pin). */
+    private boolean waveWakeNow() {
+        Calendar now = Calendar.getInstance();
+        return prefs.proximityWake() && !prefs.isNight(now) && !prefs.isAway(now);
+    }
+
+    /**
+     * Màn đang sáng: nghe cảm biến (che để tắt, vẫy để giữ sáng), CPU đã thức sẵn.
+     * Màn tắt ngoài giờ đêm, có bật vẫy tay: nghe cảm biến và giữ CPU thức để nhận sự kiện.
+     * Màn tắt ban đêm hoặc giờ vắng nhà: tắt cảm biến, thả CPU ngủ; báo thức đầu giờ ngày và hết giờ vắng
+     * (Scheduler) gọi lại sync().
+     */
+    private void syncState() {
+        if (cpuLock == null || power == null || sensors == null) return;
+        boolean screenOn = Screen.isOn(power);
+        boolean wave = waveWakeNow();
+        boolean listen = screenOn ? (prefs.proximitySleep() || prefs.proximityWake()) : wave;
+        boolean hold = !screenOn && wave;
+        if (listen && !listening) {
+            sensors.registerListener(this, proximity, SensorManager.SENSOR_DELAY_NORMAL);
+            listening = true;
+        } else if (!listen && listening) {
+            sensors.unregisterListener(this);
+            listening = false;
+            gesture.reset();
+        }
+        try {
+            if (hold && !cpuLock.isHeld()) cpuLock.acquire();
+            else if (!hold && cpuLock.isHeld()) cpuLock.release();
+        } catch (Throwable t) {
+            Log.w(TAG, "wakelock", t);
+        }
+        main.removeCallbacks(recheck);
+        if (hold) main.postDelayed(recheck, RECHECK_MS);
     }
 
     @Override
@@ -128,8 +194,9 @@ public class WakeService extends Service implements SensorEventListener {
                 notifyBoard(false);
                 break;
             case ProximityGesture.WAKE:
+                if (!waveWakeNow()) break; // ban đêm: không bật màn bằng vẫy tay
                 notifyBoard(false); // gỡ lớp phủ đen nếu có
-                if (!Screen.isOn(power) && prefs.proximityWake()) Screen.wakeAndShow(this);
+                if (!Screen.isOn(power)) Screen.wakeAndShow(this);
                 break;
             case ProximityGesture.SLEEP:
                 notifyBoard(true);

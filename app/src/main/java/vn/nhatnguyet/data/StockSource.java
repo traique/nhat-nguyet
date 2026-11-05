@@ -170,8 +170,14 @@ public final class StockSource extends Source {
         }
         long to = System.currentTimeMillis() / 1000 + 86400;
         long from = to - 30L * 86400;
-        JSONObject r = new JSONObject(Http.getText(CHART + kind + "?from=" + from + "&to=" + to
-                + "&symbol=" + api + "&resolution=1D"));
+        JSONObject r;
+        try {
+            r = new JSONObject(Http.getText(CHART + kind + "?from=" + from + "&to=" + to
+                    + "&symbol=" + api + "&resolution=1D"));
+        } catch (Http.HttpStatusException e) {
+            if (e.code == 400 || e.code == 404 || e.code == 422) throw new IOException("mã không hợp lệ: " + api);
+            throw e;
+        }
         if (r.has("status") && !r.has("c")) throw new IOException("mã không hợp lệ: " + api);
         JSONArray c = r.optJSONArray("c");
         JSONArray t = r.optJSONArray("t");

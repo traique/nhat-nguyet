@@ -106,6 +106,7 @@ public final class Http {
     /** Mở kết nối và tự theo chuyển hướng (kể cả sang máy chủ khác, vd. GitHub Release). */
     private static HttpURLConnection open(String method, String url, byte[] body) throws IOException {
         String current = url;
+        boolean keepMethod = false;
         for (int hop = 0; hop <= MAX_REDIRECTS; hop++) {
             long sentAt = System.currentTimeMillis();
             URL u = new URL(current);
@@ -121,7 +122,7 @@ public final class Http {
             c.setRequestProperty("User-Agent", UA);
             c.setRequestProperty("Accept-Language", "vi-VN,vi;q=0.9,en;q=0.5");
             c.setRequestProperty("Accept", "*/*");
-            boolean send = body != null && hop == 0;
+            boolean send = body != null && (hop == 0 || keepMethod);
             if (send) {
                 c.setRequestMethod(method);
                 c.setDoOutput(true);
@@ -134,7 +135,7 @@ public final class Http {
                     closeQuietly(os);
                 }
             } else {
-                c.setRequestMethod(hop == 0 ? method : "GET");
+                c.setRequestMethod(hop == 0 || keepMethod ? method : "GET");
             }
             int code;
             try {
@@ -147,8 +148,14 @@ public final class Http {
                 String loc = c.getHeaderField("Location");
                 c.disconnect();
                 if (loc == null) throw new IOException("HTTP " + code);
-                current = new URL(u, loc).toString();
-                if (code == 303) body = null;
+                URL next = new URL(u, loc);
+                if ("https".equalsIgnoreCase(u.getProtocol()) && !"https".equalsIgnoreCase(next.getProtocol())) {
+                    throw new IOException("chuyển hướng sang kết nối không mã hoá");
+                }
+                current = next.toString();
+                // 307/308 giữ nguyên phương thức và nội dung; 301/302/303 chuyển thành GET.
+                keepMethod = code == 307 || code == 308;
+                if (!keepMethod) body = null;
                 continue;
             }
             if (code < 200 || code >= 300) {
@@ -186,7 +193,10 @@ public final class Http {
 
     /** Diễn giải lỗi mạng thành câu tiếng Việt ngắn để hiện trên bảng. */
     public static String describe(Throwable t) {
-        if (t instanceof HttpStatusException) return "máy chủ báo lỗi " + ((HttpStatusException) t).code;
+        if (t instanceof HttpStatusException) {
+            int code = ((HttpStatusException) t).code;
+            return code == 429 ? "nguồn tạm chặn vì gọi quá nhiều" : code >= 500 ? "nguồn đang gặp sự cố" : "nguồn từ chối (" + code + ")";
+        }
         if (t instanceof UnknownHostException) return "không có mạng";
         if (t instanceof SocketTimeoutException) return "mạng chậm, hết thời gian chờ";
         if (t instanceof SSLException) {
@@ -195,9 +205,21 @@ public final class Http {
             return "kết nối bảo mật thất bại";
         }
         String m = t.getMessage();
-        if (m == null || m.length() == 0) m = t.getClass().getSimpleName();
+        // Thông điệp tiếng Việt do app tự ném (vd. "mã không hợp lệ: ABC") thì giữ; còn lại là lỗi kỹ thuật.
+        if (m == null || m.length() == 0 || !hasVietnamese(m)) {
+            android.util.Log.w("Http", "lỗi: " + t);
+            return "không kết nối được";
+        }
         if (m.length() > 60) m = m.substring(0, 60) + "…";
         return m;
+    }
+
+    private static boolean hasVietnamese(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c > 127 || c == ' ') return true;
+        }
+        return false;
     }
 
     public static final class HttpStatusException extends IOException {

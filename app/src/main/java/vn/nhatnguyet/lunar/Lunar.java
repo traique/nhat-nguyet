@@ -5,9 +5,12 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Âm lịch Việt Nam (múi giờ +7) theo thuật toán của Hồ Ngọc Đức,
- * kèm can chi, tiết khí, ngày/giờ hoàng đạo và ngày lễ.
+ * Âm lịch Việt Nam (múi giờ +7) theo thuật toán của Hồ Ngọc Đức
+ * (https://www.informatik.uni-leipzig.de/~duc/amlich/, mã JavaScript gốc:
+ * "Copyright 2004 Ho Ngoc Duc. All Rights Reserved."), dựa trên công thức thiên văn của Jean Meeus;
+ * cài đặt lại bằng Java, kèm can chi, tiết khí, ngày/giờ hoàng đạo và ngày lễ.
  * Thuần Java, không phụ thuộc java.time nên chạy được trên Android 4.0.3.
+ * Đã đối chiếu với bảng chuẩn của tác giả cho 1900–2100.
  */
 public final class Lunar {
     public static final double TZ = 7.0;
@@ -40,27 +43,42 @@ public final class Lunar {
         public final int month;
         public final boolean major;
         public final boolean personal;
+        /** Năm dương lịch bắt đầu có ngày lễ này (0 = từ trước tới nay). */
+        public final int sinceYear;
 
         Holiday(String name, boolean lunar, int day, int month, boolean major) {
-            this(name, lunar, day, month, major, false);
+            this(name, lunar, day, month, major, false, 0);
         }
 
-        private Holiday(String name, boolean lunar, int day, int month, boolean major, boolean personal) {
+        /** Ngày lễ mới được quy định: chỉ tính từ năm sinceYear. */
+        Holiday(String name, boolean lunar, int day, int month, boolean major, int sinceYear) {
+            this(name, lunar, day, month, major, false, sinceYear);
+        }
+
+        private Holiday(String name, boolean lunar, int day, int month, boolean major, boolean personal, int sinceYear) {
             this.name = name;
             this.lunar = lunar;
             this.day = day;
             this.month = month;
             this.major = major;
             this.personal = personal;
+            this.sinceYear = sinceYear;
         }
 
         public static Holiday personal(String name, boolean lunar, int day, int month) {
-            return new Holiday(name, lunar, day, month, true, true);
+            return new Holiday(name, lunar, day, month, true, true, 0);
         }
 
-        /** Ngày âm không tính tháng nhuận; ngày 30 âm rơi vào tháng thiếu thì tính là ngày 29. */
+        /**
+         * Ngày âm không tính tháng nhuận; ngày 30 âm rơi vào tháng thiếu thì tính là ngày 29.
+         * Ngày dương 29/2 ở năm không nhuận tính là 28/2.
+         */
         public boolean on(int dd, int mm, LunarDate ld) {
-            if (!lunar) return day == dd && month == mm;
+            if (sinceYear > 0 && jdToDate(ld.jd)[2] < sinceYear) return false;
+            if (!lunar) {
+                if (day == dd && month == mm) return true;
+                return day == 29 && month == 2 && dd == 28 && mm == 2 && !isLeapYear(jdToDate(ld.jd)[2]);
+            }
             if (ld.leap || ld.month != month) return false;
             return ld.day == day || (day == 30 && ld.day == 29 && lunarMonthLength(ld) == 29);
         }
@@ -78,8 +96,13 @@ public final class Lunar {
             new Holiday("Quốc khánh", false, 2, 9, true),
             new Holiday("Phụ nữ Việt Nam", false, 20, 10, false),
             new Holiday("Nhà giáo Việt Nam", false, 20, 11, false),
+            // Nghị quyết 28/2026/QH16 (hiệu lực 1/7/2026): 24/11 hằng năm là Ngày Văn hóa Việt Nam,
+            // người lao động được nghỉ hưởng nguyên lương.
+            new Holiday("Ngày Văn hóa Việt Nam", false, 24, 11, true, 2026),
             new Holiday("Giáng sinh", false, 25, 12, false),
             new Holiday("Tết Nguyên đán", true, 1, 1, true),
+            new Holiday("Mùng 2 Tết", true, 2, 1, true),
+            new Holiday("Mùng 3 Tết", true, 3, 1, true),
             new Holiday("Rằm tháng Giêng", true, 15, 1, false),
             new Holiday("Tết Hàn thực", true, 3, 3, false),
             new Holiday("Giỗ Tổ Hùng Vương", true, 10, 3, true),
@@ -88,7 +111,18 @@ public final class Lunar {
             new Holiday("Lễ Vu Lan", true, 15, 7, false),
             new Holiday("Tết Trung thu", true, 15, 8, false),
             new Holiday("Ông Công ông Táo", true, 23, 12, false),
+            // Ngày 30 tháng Chạp rơi vào tháng thiếu thì tính là 29 (quy tắc trong Holiday.on).
+            new Holiday("Giao thừa", true, 30, 12, false),
     };
+
+    public static boolean isLeapYear(int y) {
+        return (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+    }
+
+    /** Các ngày Tết âm lịch (mùng 1 đến mùng 3): dùng để lọc danh sách lễ sắp tới. */
+    public static boolean isTet(Holiday h) {
+        return h.lunar && !h.personal && h.month == 1 && h.day >= 1 && h.day <= 3;
+    }
 
     private Lunar() {}
 
@@ -161,7 +195,10 @@ public final class Lunar {
         double L0 = 280.46645 + 36000.76983 * T + 0.0003032 * T2;
         double DL = (1.914600 - 0.004817 * T - 0.000014 * T2) * Math.sin(dr * M);
         DL = DL + (0.019993 - 0.000101 * T) * Math.sin(dr * 2 * M) + 0.000290 * Math.sin(dr * 3 * M);
-        double L = (L0 + DL) * dr;
+        // Hiệu chỉnh chương động và quang sai (Meeus 25.8): tránh lệch ngày bắt đầu tiết khí
+        // khi tiết rơi trong vài chục phút sau nửa đêm.
+        double omega = 125.04 - 1934.136 * T;
+        double L = (L0 + DL - 0.00569 - 0.00478 * Math.sin(omega * dr)) * dr;
         L = L - Math.PI * 2 * Math.floor(L / (Math.PI * 2));
         return L;
     }
@@ -197,7 +234,8 @@ public final class Lunar {
         int dayNumber = jdFromDate(dd, mm, yy);
         int k = (int) Math.floor((dayNumber - 2415021.076998695) / 29.530588853);
         int monthStart = newMoonDay(k + 1);
-        if (monthStart > dayNumber) monthStart = newMoonDay(k);
+        // Ước lượng k có thể lệch quá một tháng ở vài ngày xa (vd. 7/5/2054): lùi tới khi đúng.
+        while (monthStart > dayNumber) monthStart = newMoonDay(k--);
         int a11 = lunarMonth11(yy);
         int b11 = a11;
         int lunarYear;

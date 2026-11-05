@@ -14,8 +14,10 @@ import java.util.List;
 import vn.nhatnguyet.Fmt;
 import vn.nhatnguyet.Theme;
 import vn.nhatnguyet.data.DataHub;
+import vn.nhatnguyet.data.WeatherSource;
 import vn.nhatnguyet.data.StockSource;
 import vn.nhatnguyet.data.WeatherCodes;
+import vn.nhatnguyet.lunar.DaysOff;
 import vn.nhatnguyet.lunar.Lunar;
 import vn.nhatnguyet.lunar.LunarDate;
 
@@ -148,7 +150,8 @@ final class Pages {
         LunarDate ld = Lunar.solarToLunar(d, m, y);
         Lunar.Holiday hol = Lunar.holidayOn(d, m, ld);
         Lunar.Holiday own = Lunar.personalOn(d, m, ld);
-        boolean red = hol != null || now.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY;
+        String off = DaysOff.name(d, m, y);
+        boolean red = DaysOff.isRed(d, m, y, ld) || now.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY;
         int solarColor = red ? Theme.LUNAR : Theme.TEXT;
 
         LinearLayout faces = ui.row();
@@ -193,11 +196,13 @@ final class Pages {
         FitColumn col = column();
         col.addFill(faces);
 
-        if (hol != null || own != null) {
+        // Ngày nghỉ không có tên lễ riêng (nghỉ bù, nghỉ Tết, hoán đổi) thì ghi tên ngày nghỉ.
+        String holName = hol != null ? hol.name : off;
+        if (holName != null || own != null) {
             FitLine h = line(BODY, true);
             h.setCenter(true);
-            if (own != null && hol != null) h.set(Theme.LUNAR, own.name + " · " + hol.name, own.name);
-            else h.set(Theme.LUNAR, own != null ? own.name : hol.name);
+            if (own != null && holName != null) h.set(Theme.LUNAR, own.name + " · " + holName, own.name);
+            else h.set(Theme.LUNAR, own != null ? own.name : holName);
             col.add(h, 1, ui.px(8));
         }
         StringBuilder gio = new StringBuilder();
@@ -274,7 +279,7 @@ final class Pages {
         }
         int p = 5;
         for (Lunar.Upcoming u : up) {
-            if (u.holiday.name.startsWith("Tết Nguyên")) continue;
+            if (Lunar.isTet(u.holiday)) continue;
             String when = (u.days == 1 ? "Ngày mai" : "Còn " + u.days + " ngày") + " · " + u.holiday.name;
             FitLine ul = line(SMALL + 1, false);
             ul.set(Theme.DIM, when + " (" + Fmt.two(u.solar[0]) + "/" + Fmt.two(u.solar[1]) + ")", when);
@@ -290,10 +295,11 @@ final class Pages {
         if (w == null) return empty("weather");
         FitColumn col = column();
         JSONArray hours = w.optJSONArray("hours");
-        if (hours != null && hours.length() > 1) {
+        int start = WeatherSource.firstUpcomingHour(w, System.currentTimeMillis());
+        if (hours != null && hours.length() > start) {
             LinearLayout strip = ui.row();
-            int count = Math.min(Math.max(4, Math.min(8, (int) (widthU / 46))), hours.length() - 1);
-            for (int i = 1; i <= count; i++) {
+            int count = Math.min(Math.max(4, Math.min(8, (int) (widthU / 46))), hours.length() - start);
+            for (int i = start; i < start + count; i++) {
                 JSONObject h = hours.optJSONObject(i);
                 LinearLayout c = ui.col();
                 c.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -354,7 +360,7 @@ final class Pages {
             }
         }
         col.addFill(ui.spacer());
-        col.add(note("weather", w.optString("place") + " · Open-Meteo"), 0);
+        col.add(note("weather", w.optString("place") + " · Open-Meteo.com"), 0);
         return col;
     }
 
@@ -442,7 +448,7 @@ final class Pages {
         col.addFill(ui.spacer());
         String upd = f.optString("updated");
         if (nar && upd.length() == 10) upd = upd.substring(0, 5);
-        col.add(note("fuel", "đồng/lít · Petrolimex" + (upd.length() > 0 ? " · " + upd : "")), 0);
+        col.add(note("fuel", "đồng/lít · Petrolimex" + (upd.length() > 0 ? " · " + upd : "") + (narrow() ? "" : " · theo giaxanghomnay.com")), 0);
         return col;
     }
 
@@ -515,8 +521,8 @@ final class Pages {
         }
         col.addFill(ui.spacer());
         boolean open = StockSource.marketOpen();
-        col.add(note("stocks", narrow() ? (open ? "Trong phiên" : "Phiên gần nhất") + " · nghìn đồng"
-                : (open ? "Đang trong phiên" : "Ngoài giờ giao dịch · phiên gần nhất") + " · giá nghìn đồng"), 0);
+        col.add(note("stocks", narrow() ? (open ? "Trong phiên" : "Phiên gần nhất") + " · nghìn đồng · DNSE"
+                : (open ? "Đang trong phiên" : "Ngoài giờ giao dịch · phiên gần nhất") + " · giá nghìn đồng · DNSE/Entrade, tham khảo"), 0);
         return col;
     }
 
@@ -542,7 +548,9 @@ final class Pages {
             LinearLayout box = ui.col();
             box.setPadding(0, ui.px(k == 0 ? 0 : 7), 0, 0);
             box.addView(ui.multi(it.optString("title"), BODY, Theme.TEXT, false, 2));
-            TextView meta = ui.text(it.optString("source") + " · " + Fmt.agoPhrase(it.optLong("time"), now), SMALL, Theme.DIM, false);
+            long t = it.optLong("time");
+            TextView meta = ui.text(t > 0 ? it.optString("source") + " · " + Fmt.agoPhrase(t, now) : it.optString("source"),
+                    SMALL, Theme.DIM, false);
             meta.setPadding(0, ui.px(2), 0, 0);
             box.addView(meta);
             col.add(box, 1 + k);
