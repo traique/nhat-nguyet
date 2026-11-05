@@ -18,6 +18,9 @@ import android.os.Handler;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import android.text.InputType;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.GestureDetector;
@@ -100,9 +103,13 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
     private WeatherIcon nowIcon;
     private BatteryView battView;
     private boolean flipMode;
-    private boolean flipNarrow;
+    /** Bề rộng dòng thông tin dưới thẻ lật; đã chừa dòng sự kiện khi dựng bố cục hay chưa. */
+    private float flipInfoW;
+    private boolean flipHasNote;
     private FlipCard flipHours, flipMinutes;
-    private TextView flipDate, flipLunar, flipTemp, flipDesc;
+    private TextView flipDate, flipSep, flipLunar, flipTemp, flipDesc;
+    private FitLine flipNote;
+    private int flipIconPx;
     private WeatherIcon flipIcon;
     private TextView battText;
     private int battPct = -1;
@@ -937,15 +944,15 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         col.add(hoursRow, 6, ui.px(6));
 
         col.addFill(ui.spacer());
-        col.add(buildBottomRow(), 0, ui.px(4));
+        col.add(buildBottomRow(false), 0, ui.px(4));
         View.OnTouchListener swipe = brightnessSwipe();
         clock.setOnTouchListener(swipe);
         col.setOnTouchListener(swipe);
         return col;
     }
 
-    /** Dòng trạng thái + pin (dùng chung cho bảng lịch và đồng hồ lật). */
-    private View buildBottomRow() {
+    /** Dòng trạng thái + pin (dùng chung cho bảng lịch và đồng hồ lật); đồng hồ lật để nút Cài đặt ở cuối dòng. */
+    private View buildBottomRow(boolean gear) {
         LinearLayout bottom = ui.row();
         statusText = line(13, false);
         statusText.setClickable(true);
@@ -964,6 +971,7 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         battText = ui.text(13, Theme.DIM, true);
         battText.setPadding(ui.px(4), 0, 0, 0);
         bottom.addView(battText);
+        if (gear) bottom.addView(gearButton(Theme.META));
         renderBattery();
         return bottom;
     }
@@ -984,7 +992,8 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         battView = null;
         battText = null;
         flipHours = flipMinutes = null;
-        flipDate = flipLunar = flipTemp = flipDesc = null;
+        flipDate = flipSep = flipLunar = flipTemp = flipDesc = null;
+        flipNote = null;
         flipIcon = null;
     }
 
@@ -995,12 +1004,16 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         return t;
     }
 
-    /** Chế độ chỉ đồng hồ: hai thẻ lật giờ/phút kiểu HTC, thông tin phụ bên dưới. */
+    /**
+     * Chế độ chỉ đồng hồ: hai thẻ lật giờ/phút kiểu HTC; bên dưới là ngày và âm lịch, dòng sự kiện (chỉ khi có),
+     * thời tiết; cuối màn là dòng trạng thái, pin và nút Cài đặt (để góc trên trống, không đè lên thẻ).
+     */
     private void buildFlip(int w, int h) {
         int pad = ui.px(10);
         LinearLayout col = ui.col();
         col.setGravity(Gravity.CENTER_HORIZONTAL);
-        col.setPadding(pad, pad, pad, pad);
+        // Dòng cuối cao bằng vùng chạm của nút Cài đặt nên tự cách mép dưới; không cần lề dưới.
+        col.setPadding(pad, pad, pad, 0);
         col.setOnLongClickListener(new View.OnLongClickListener() {
             @Override
             public boolean onLongClick(View v) {
@@ -1012,11 +1025,13 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         content.addView(col, new FrameLayout.LayoutParams(-1, -1));
 
         float innerW = w - 2f * pad;
-        float innerH = h - 2f * pad;
-        flipNarrow = innerW / ui.density < 560;
+        float innerH = h - pad;
+        flipInfoW = innerW;
         boolean info = prefs.flipInfo();
-        float bottomH = ui.pxf(22);
-        float infoH = info ? innerH * 0.24f : 0f;
+        Calendar today = Calendar.getInstance();
+        flipHasNote = info && flipNoteFor(today) != null;
+        float bottomH = ui.pxf(38);
+        float infoH = info ? innerH * (flipHasNote ? 0.31f : 0.24f) : 0f;
         float avail = innerH - bottomH - infoH;
         // Hai thẻ rộng 1,1 lần chiều cao, khe giữa 0,08 lần chiều cao.
         float ch = Math.min(avail * 0.92f, innerW * 0.96f / (2 * 1.1f + 0.08f));
@@ -1037,57 +1052,97 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         col.addView(cards, new LinearLayout.LayoutParams(-2, -2));
 
         if (info) {
-            float big = Math.max(ui.pxf(14), Math.min(ch * 0.12f, infoH * 0.3f));
+            float big = Math.max(ui.pxf(14), Math.min(ch * 0.12f, innerH * 0.24f * 0.3f));
             float small = big * 0.86f;
             LinearLayout r1 = ui.row();
             r1.setGravity(Gravity.CENTER);
             flipDate = sized(ui.text(16, Theme.TEXT, false), big);
             r1.addView(flipDate);
-            r1.addView(sized(ui.text("  ·  ", 16, Theme.META, false), big));
+            flipSep = sized(ui.text("  ·  ", 16, Theme.META, false), big);
+            r1.addView(flipSep);
             flipLunar = sized(ui.text(16, Theme.LUNAR, true), big);
             r1.addView(flipLunar);
-            LinearLayout.LayoutParams r1p = new LinearLayout.LayoutParams(-2, -2);
+            LinearLayout.LayoutParams r1p = new LinearLayout.LayoutParams(-1, -2);
             r1p.topMargin = Math.round(ch * 0.07f);
             col.addView(r1, r1p);
 
+            if (flipHasNote) {
+                flipNote = new FitLine(this, small, false);
+                flipNote.setCenter(true);
+                LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(-1, -2);
+                np.topMargin = Math.round(small * 0.3f);
+                col.addView(flipNote, np);
+            }
+
             LinearLayout r2 = ui.row();
             r2.setGravity(Gravity.CENTER);
-            flipIcon = new WeatherIcon(this, Math.round(small * 1.5f));
+            flipIconPx = Math.round(small * 1.5f);
+            flipIcon = new WeatherIcon(this, flipIconPx);
             r2.addView(flipIcon);
             flipTemp = sized(ui.text(16, Theme.TEXT, true), small * 1.15f);
             flipTemp.setPadding(Math.round(small * 0.3f), 0, Math.round(small * 0.4f), 0);
             r2.addView(flipTemp);
             flipDesc = sized(ui.text(14, Theme.DIM, false), small);
             r2.addView(flipDesc);
-            LinearLayout.LayoutParams r2p = new LinearLayout.LayoutParams(-2, -2);
-            r2p.topMargin = Math.round(small * 0.35f);
+            LinearLayout.LayoutParams r2p = new LinearLayout.LayoutParams(-1, -2);
+            r2p.topMargin = Math.round(small * (flipHasNote ? 0.3f : 0.35f));
             col.addView(r2, r2p);
         }
         col.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 1f));
-        col.addView(buildBottomRow(), new LinearLayout.LayoutParams(-1, -2));
-
-        content.addView(gearButton(Theme.META), new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.RIGHT));
+        col.addView(buildBottomRow(true), new LinearLayout.LayoutParams(-1, Math.round(bottomH)));
     }
+
+    /** Đồng hồ lật chỉ nhắc chuyện trong ngày hoặc vài ngày tới; đếm ngược xa đã có ở bảng lịch. */
+    private static Note flipNoteFor(Calendar c) {
+        int d = c.get(Calendar.DAY_OF_MONTH), m = c.get(Calendar.MONTH) + 1, y = c.get(Calendar.YEAR);
+        return dayNote(d, m, y, Lunar.solarToLunar(d, m, y), 7, 7, false);
+    }
+
+    private final Runnable rebuildTask = new Runnable() {
+        @Override
+        public void run() {
+            rebuild();
+        }
+    };
 
     private void renderFlipClock(Calendar now) {
         if (flipHours == null) return;
         boolean animate = !prefs.batterySaver(); // tiết kiệm pin: đổi số ngay, không hiệu ứng lật
         flipHours.setText(Fmt.two(now.get(Calendar.HOUR_OF_DAY)), animate);
         flipMinutes.setText(Fmt.two(now.get(Calendar.MINUTE)), animate);
-        if (flipDate != null) {
-            // Màn hẹp (3,5"–4"): bỏ năm để dòng ngày + âm lịch vừa một hàng.
-            flipDate.setText(Fmt.WEEKDAYS[now.get(Calendar.DAY_OF_WEEK)] + ", "
-                    + (flipNarrow ? Fmt.ddmm(now) : Fmt.ddmmyyyy(now)));
-            LunarDate ld = Lunar.solarToLunar(now.get(Calendar.DAY_OF_MONTH), now.get(Calendar.MONTH) + 1, now.get(Calendar.YEAR));
-            int dd = now.get(Calendar.DAY_OF_MONTH), mm = now.get(Calendar.MONTH) + 1;
-            Lunar.Holiday hol = Lunar.eventOn(dd, mm, ld);
-            String off = hol == null ? DaysOff.name(dd, mm, now.get(Calendar.YEAR)) : null;
-            String lunar = "Âm lịch " + ld.day + "/" + ld.month + (ld.leap ? " nhuận" : "") + " " + Lunar.yearCanChi(ld.year);
-            if (hol != null) lunar += " · " + hol.name;
-            else if (off != null) lunar += " · " + off;
-            flipLunar.setText(lunar);
-            flipLunar.setTextColor(Theme.LUNAR);
+        String key = Fmt.ddmmyyyy(now);
+        if (flipDate == null || key.equals(dayKey)) return;
+        dayKey = key;
+        Note note = flipNoteFor(now);
+        if ((note != null) != flipHasNote) {
+            // Sang ngày mới có (hoặc hết) chuyện để nhắc: dựng lại để thẻ lật nhường (hoặc lấy lại) chỗ.
+            root.removeCallbacks(rebuildTask);
+            root.post(rebuildTask);
         }
+        if (flipNote != null && note != null) flipNote.set(note.color, note.text);
+
+        int dd = now.get(Calendar.DAY_OF_MONTH), mm = now.get(Calendar.MONTH) + 1;
+        LunarDate ld = Lunar.solarToLunar(dd, mm, now.get(Calendar.YEAR));
+        String wd = Fmt.WEEKDAYS[now.get(Calendar.DAY_OF_WEEK)];
+        String lm = ld.day + "/" + ld.month + (ld.leap ? " nhuận" : "");
+        String year = Lunar.yearCanChi(ld.year);
+        // Ngày + âm lịch trên một hàng, hai màu; rút dần (bỏ năm dương, năm âm, viết tắt) cho vừa bề ngang.
+        String[][] variants = {
+                {wd + ", " + Fmt.ddmmyyyy(now), "Âm lịch " + lm + " " + year},
+                {wd + ", " + Fmt.ddmm(now), "Âm lịch " + lm + " " + year},
+                {wd + ", " + Fmt.ddmm(now), "Âm lịch " + lm},
+                {Fmt.WEEKDAYS_SHORT[now.get(Calendar.DAY_OF_WEEK)] + ", " + Fmt.ddmm(now), "Âm " + lm},
+        };
+        float sep = flipSep.getPaint().measureText(flipSep.getText().toString());
+        String[] pick = variants[variants.length - 1];
+        for (String[] v : variants) {
+            if (flipDate.getPaint().measureText(v[0]) + sep + flipLunar.getPaint().measureText(v[1]) <= flipInfoW) {
+                pick = v;
+                break;
+            }
+        }
+        flipDate.setText(pick[0]);
+        flipLunar.setText(pick[1]);
     }
 
     private void renderFlipWeather() {
@@ -1098,17 +1153,37 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             flipIcon.setVisibility(View.GONE);
             flipTemp.setText("");
             DataHub.Entry e = hub.entry("weather");
-            flipDesc.setText(e != null && e.error != null ? "Chưa lấy được thời tiết" : "Đang tải thời tiết…");
+            boolean failed = e != null && e.error != null;
+            flipDesc.setTextColor(failed ? Theme.WARN : Theme.DIM);
+            flipDesc.setText(failed ? "Chưa lấy được thời tiết" : "Đang tải thời tiết…");
             return;
         }
         int code = now.optInt("code");
         flipIcon.setVisibility(View.VISIBLE);
         flipIcon.set(code, now.optInt("day", 1) == 1, Theme.BG);
-        flipTemp.setText(Fmt.temp(now.optDouble("t")));
-        // Tên thành phố đã có ở dòng trạng thái; thêm báo sắp mưa nếu có.
+        String temp = Fmt.temp(now.optDouble("t"));
+        flipTemp.setText(temp);
+        String text = WeatherCodes.text(code);
         String rain = WeatherSource.rainSoon(w);
-        flipDesc.setText(rain == null ? WeatherCodes.text(code)
-                : WeatherCodes.text(code) + " · " + rain.replaceFirst(" \\(.*\\)$", "").toLowerCase(new java.util.Locale("vi")));
+        flipDesc.setTextColor(Theme.DIM);
+        if (rain == null) {
+            flipDesc.setText(text);
+            return;
+        }
+        // Báo mưa tô màu như ở cột đồng hồ. Thiếu chỗ thì bỏ tên trời hiện tại (biểu tượng đã cho thấy), giữ báo mưa.
+        String when = rain.replaceFirst(" \\(.*\\)$", "");
+        int rc = rain.startsWith("Sắp có dông") ? Theme.WARN : Theme.RAIN;
+        String both = text + " · " + when.toLowerCase(new java.util.Locale("vi"));
+        float room = flipInfoW - flipIconPx - flipTemp.getPaint().measureText(temp)
+                - flipTemp.getPaddingLeft() - flipTemp.getPaddingRight();
+        if (flipDesc.getPaint().measureText(both) <= room) {
+            SpannableString s = new SpannableString(both);
+            s.setSpan(new ForegroundColorSpan(rc), text.length() + 3, both.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            flipDesc.setText(s);
+        } else {
+            flipDesc.setTextColor(rc);
+            flipDesc.setText(when);
+        }
     }
 
     // ------------------------------------------------------------------ pin
@@ -1321,47 +1396,54 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         String day = "Ngày " + Lunar.dayCanChi(ld.jd);
         canChiLine.set(Theme.DIM, day + " · tháng " + Lunar.monthCanChi(ld.month, ld.year), day);
 
+        Note note = dayNote(d, m, y, ld, 45, 60, prefs.clockDetails());
+        eventLine.setVisibility(note == null ? View.GONE : View.VISIBLE);
+        if (note != null) eventLine.set(note.color, note.text);
+    }
+
+    /** Dòng sự kiện dưới ngày âm: màu và các phương án từ dài đến ngắn. */
+    static final class Note {
+        final int color;
+        final String[] text;
+
+        Note(int color, String... text) {
+            this.color = color;
+            this.text = text;
+        }
+    }
+
+    /**
+     * Điều đáng nói về ngày d/m/y, null nếu không có. Ngày lễ (được nghỉ) báo trước tối đa holidayDays ngày,
+     * Tết tối đa tetDays ngày; details thêm hoàng đạo/hắc đạo khi không có gì khác.
+     */
+    static Note dayNote(int d, int m, int y, LunarDate ld, int holidayDays, int tetDays, boolean details) {
         Lunar.Holiday hol = Lunar.eventOn(d, m, ld);
         String off = hol == null ? DaysOff.name(d, m, y) : null;
         // Ngày riêng (giỗ, sinh nhật) được nhắc trước một tuần, trước cả mùng 1, rằm.
         Lunar.Upcoming soon = hol == null && off == null ? Lunar.nextPersonal(d, m, y, 7) : null;
-        // Chỉ hiện khi có điều đáng nói. Bản rút gọn (màn hẹp) phải giữ "hôm nay / mai / còn N ngày",
-        // nếu không người xem tưởng ngày lễ sắp tới là hôm nay.
-        String[] ev = null;
-        int color = Theme.LUNAR;
-        if (hol != null) {
-            ev = new String[]{"Hôm nay: " + hol.name, hol.name};
-        } else if (off != null) {
-            // Nghỉ bù, ngày nghỉ Tết, nghỉ hoán đổi theo lịch nhà nước.
-            ev = new String[]{"Hôm nay: " + off, off};
-        } else if (soon != null) {
-            ev = countdown(soon);
-            color = Theme.TEXT;
-        } else if (ld.day == 1 && !ld.leap) {
-            ev = new String[]{"Mùng 1 tháng " + Lunar.MONTH_NAME[ld.month]};
-        } else if (ld.day == 15) {
-            ev = new String[]{"Rằm tháng " + Lunar.MONTH_NAME[ld.month]};
-        } else if (Lunar.solarTermStarts(ld.jd)) {
-            ev = new String[]{"Bắt đầu tiết " + Lunar.solarTerm(ld.jd), "Tiết " + Lunar.solarTerm(ld.jd)};
-            color = Theme.TEXT;
-        } else {
-            List<Lunar.Upcoming> up = Lunar.upcoming(d, m, y, 1, true);
-            int tet = Lunar.daysToTet(d, m, y);
-            if (!up.isEmpty() && up.get(0).days <= 45) {
-                ev = countdown(up.get(0));
-                color = Theme.TEXT;
-            } else if (tet > 0 && tet <= 60) {
-                ev = new String[]{"Còn " + tet + " ngày đến Tết", "Tết: còn " + tet + " ngày"};
-                color = Theme.TEXT;
-            } else if (prefs.clockDetails()) {
-                boolean good = Lunar.isHoangDao(ld.jd, ld.month);
-                String kind = good ? "Ngày hoàng đạo" : "Ngày hắc đạo";
-                ev = new String[]{kind + " · tiết " + Lunar.solarTerm(ld.jd), kind};
-                color = good ? Theme.AUSPICIOUS : Theme.DIM;
-            }
+        // Bản rút gọn (màn hẹp) phải giữ "hôm nay / mai / còn N ngày", nếu không người xem tưởng ngày lễ sắp tới
+        // là hôm nay.
+        if (hol != null) return new Note(Theme.LUNAR, "Hôm nay: " + hol.name, hol.name);
+        // Nghỉ bù, ngày nghỉ Tết, nghỉ hoán đổi theo lịch nhà nước.
+        if (off != null) return new Note(Theme.LUNAR, "Hôm nay: " + off, off);
+        if (soon != null) return new Note(Theme.TEXT, countdown(soon));
+        if (ld.day == 1 && !ld.leap) return new Note(Theme.LUNAR, "Mùng 1 tháng " + Lunar.MONTH_NAME[ld.month]);
+        if (ld.day == 15) return new Note(Theme.LUNAR, "Rằm tháng " + Lunar.MONTH_NAME[ld.month]);
+        if (Lunar.solarTermStarts(ld.jd)) {
+            return new Note(Theme.TEXT, "Bắt đầu tiết " + Lunar.solarTerm(ld.jd), "Tiết " + Lunar.solarTerm(ld.jd));
         }
-        eventLine.setVisibility(ev == null ? View.GONE : View.VISIBLE);
-        if (ev != null) eventLine.set(color, ev);
+        List<Lunar.Upcoming> up = Lunar.upcoming(d, m, y, 1, true);
+        if (!up.isEmpty() && up.get(0).days <= holidayDays) return new Note(Theme.TEXT, countdown(up.get(0)));
+        int tet = Lunar.daysToTet(d, m, y);
+        if (tet > 0 && tet <= tetDays) {
+            return new Note(Theme.TEXT, "Còn " + tet + " ngày đến Tết", "Tết: còn " + tet + " ngày");
+        }
+        if (details) {
+            boolean good = Lunar.isHoangDao(ld.jd, ld.month);
+            String kind = good ? "Ngày hoàng đạo" : "Ngày hắc đạo";
+            return new Note(good ? Theme.AUSPICIOUS : Theme.DIM, kind + " · tiết " + Lunar.solarTerm(ld.jd), kind);
+        }
+        return null;
     }
 
     /** "Còn 19 ngày: Ngày Văn hóa Việt Nam", rút dần nhưng luôn giữ khoảng cách ngày. */
@@ -1501,19 +1583,17 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             return;
         }
         DataHub.Entry e = hub.entry("weather");
-        String place = prefs.placeName();
-        if (e == null || e.at <= 0) {
+        // Đồng hồ lật không ghi nơi ở (ai cũng biết mình ở đâu); tắt thông tin thì không có thời tiết để nói.
+        String place = flipMode ? "" : prefs.placeName();
+        long now = System.currentTimeMillis();
+        if ((flipMode && !prefs.flipInfo()) || e == null || e.at <= 0 || now - e.at < 45 * 60_000L) {
             statusText.set(Theme.META, place);
             return;
         }
         // Chỉ nói giờ cập nhật khi dữ liệu đã cũ; bình thường thì dòng này chỉ ghi nơi ở cho đỡ rối.
-        long now = System.currentTimeMillis();
-        if (now - e.at < 45 * 60_000L) {
-            statusText.set(Theme.META, place);
-            return;
-        }
         String fresh = "cập nhật " + Fmt.agoPhrase(e.at, now);
-        statusText.set(Theme.META, place + " · " + fresh, fresh);
+        if (flipMode) statusText.set(Theme.META, "Thời tiết " + fresh, fresh);
+        else statusText.set(Theme.META, place + " · " + fresh, fresh);
     }
 
     @SuppressLint("NewApi")

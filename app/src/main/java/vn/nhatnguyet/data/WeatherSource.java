@@ -23,7 +23,8 @@ public final class WeatherSource extends Source {
 
     @Override
     public boolean enabled(Prefs prefs) {
-        return true; // luôn cần cho cột trái
+        // Luôn cần cho cột đồng hồ; đồng hồ lật tắt dòng thông tin thì không hiện thời tiết nên không tải cho đỡ pin.
+        return !prefs.clockOnly() || prefs.flipInfo();
     }
 
     @Override
