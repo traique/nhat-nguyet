@@ -2,7 +2,8 @@ name: Android
 
 on:
   push:
-    branches: ['**']
+    # Nhánh Dependabot đã chạy qua pull_request; bỏ ở push để mỗi PR chỉ chạy (và báo) một lần.
+    branches: ['**', '!dependabot/**']
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -16,9 +17,11 @@ on:
 permissions:
   contents: read
 
+# Tách nhóm theo sự kiện: lần phát hành (workflow_dispatch) không huỷ lần build do push cùng commit, nếu không
+# commit trên main bị dấu ✗ "cancelled". Chỉ huỷ lần chạy cũ ở nhánh làm việc và PR; main và tag luôn chạy hết.
 concurrency:
-  group: android-${{ github.ref }}
-  cancel-in-progress: true
+  group: android-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   build:
