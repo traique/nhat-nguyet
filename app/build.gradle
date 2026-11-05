@@ -132,8 +132,8 @@ dependencies {
     // Conscrypt 2.5.x là dòng cuối còn hỗ trợ Android cũ (minSdk 9); 2.5.3 căn thư viện native 16 KB.
     // Từ 2.6.0 đòi API 21. Chỉ nạp khi chạy trên Android < 5 (net/Tls.java).
     // Bản store (Android 7+) chỉ cần để biên dịch, không đóng gói thư viện native.
-    githubImplementation 'org.conscrypt:conscrypt-android:2.5.3'
-    storeCompileOnly 'org.conscrypt:conscrypt-android:2.5.3'
+    githubImplementation 'org.conscrypt:conscrypt-android:2.8.0'
+    storeCompileOnly 'org.conscrypt:conscrypt-android:2.8.0'
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20231013'
     testImplementation 'net.sf.kxml:kxml2:2.3.0'
