@@ -3,6 +3,7 @@
 ## 1.0.2
 
 - Lần đầu mở app hỏi nơi ở để thời tiết đúng chỗ ngay; màn Cài đặt gọn hơn, phần ít dùng gom vào "Nâng cao".
+- Màn Cài đặt: mục lục bên trái trên màn ngang rộng (chạm để nhảy tới mục); xếp lại theo mức hay dùng (Nơi ở, Màn hình, Ngày giỗ, Ngày và đêm, Tự bật lại, Pin); chọn báo và mã chứng khoán chỉ hiện khi bật trang tương ứng; giờ ngày, giờ vắng chọn bằng ô bấm thay cho thanh trượt; trang và báo xếp hai cột; danh sách quyền chỉ hiện quyền tính năng đang bật cần, kèm số quyền còn thiếu; bớt ghi chú lặp. Trang dài còn khoảng hai phần ba so với trước.
 - Cột đồng hồ gọn hơn: ba khối giờ, âm lịch, thời tiết; bỏ dòng can chi, "ngày hoàng đạo", độ ẩm, dự báo theo giờ và "vừa cập nhật" (đã có ở trang bên phải; bật lại trong Nâng cao). Không khí chỉ hiện khi từ mức kém.
 - Sửa dòng đếm ngược trên màn hẹp bị rút thành tên ngày lễ, dễ tưởng là hôm nay; giờ luôn giữ "còn N ngày" hoặc ngày dương.
 - Trang Tin tức chọn báo bằng ô tick; mặc định chỉ bật Tờ lịch, Lịch tháng, Thời tiết, Vàng, Xăng dầu.
