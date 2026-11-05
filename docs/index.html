@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nhật Nguyệt · Lịch treo tường cho điện thoại Android cũ</title>
+  <meta name="description" content="Biến chiếc điện thoại Android cũ (từ 4.0.3) thành lịch treo tường: đồng hồ lớn, âm dương lịch, nhắc ngày giỗ, thời tiết, giá vàng. Miễn phí, không quảng cáo, mã nguồn mở.">
+  <meta property="og:title" content="Nhật Nguyệt · Lịch treo tường từ điện thoại cũ">
+  <meta property="og:description" content="Đồng hồ lớn, âm dương lịch, nhắc ngày giỗ, thời tiết và giá vàng cho máy Android từ 4.0.3. Miễn phí, không quảng cáo.">
+  <meta property="og:image" content="https://traique.github.io/nhat-nguyet/img/screen-board-67.webp">
+  <meta name="theme-color" content="#f3f5f4">
+  <link rel="icon" href="img/icon.png">
+  <link rel="preload" href="fonts/inter-600.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="site.css">
+  <script>document.documentElement.classList.add('js')</script>
+  <script type="module" src="site.js"></script>
+</head>
+<body>
+  <header class="wrap">
+    <nav class="nav" aria-label="Chính">
+      <a class="wordmark" href="#"><img src="img/icon.png" alt="" width="32" height="32">Nhật Nguyệt</a>
+      <div class="nav-links">
+        <a href="#man-hinh">Màn hình</a>
+        <a href="#to-lich">Tờ lịch</a>
+        <a href="#cai-dat">Cài đặt</a>
+        <a href="#hoi-dap">Hỏi đáp</a>
+        <a class="button" href="https://github.com/traique/nhat-nguyet/releases/latest" data-apk>Tải APK</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero wrap" aria-labelledby="tieu-de">
+      <div class="hero-grid">
+        <div class="hero-text" data-reveal>
+          <h1 id="tieu-de">Lịch treo tường từ điện thoại cũ</h1>
+          <p class="hero-lead">Nhật Nguyệt biến chiếc Android cũ thành tấm lịch: đồng hồ lớn, âm dương lịch, nhắc ngày giỗ, thời tiết và giá vàng. Miễn phí, không quảng cáo.</p>
+          <div class="hero-cta">
+            <a class="button" href="https://github.com/traique/nhat-nguyet/releases/latest" data-apk>Tải APK</a>
+            <span class="hero-meta" data-apk-meta>Android 4.0.3 trở lên · khoảng 4 MB</span>
+          </div>
+        </div>
+        <div class="stage">
+          <div class="board" data-ui id="board" aria-label="Bảng lịch của ứng dụng, chạy theo giờ Việt Nam">
+            <img src="img/screen-board-55.webp" width="1280" height="720" alt="Bảng lịch trên điện thoại 5,5 inch: đồng hồ 10:40, Thứ Năm 05/11/2026, âm lịch 27/9 Bính Ngọ, trời có mây 31 độ, tờ lịch ngày 5 và 27 âm">
+          </div>
+        </div>
+        <div class="stage-tools">
+          <div class="tear" role="group" aria-label="Lật tờ lịch">
+            <span class="tear-label">Lật tờ lịch</span>
+            <button class="chip" type="button" data-step="-1">Hôm trước</button>
+            <button class="chip" type="button" data-step="0" aria-pressed="true">Hôm nay</button>
+            <button class="chip" type="button" data-step="1">Hôm sau</button>
+          </div>
+          <div class="gio">
+            <label for="gio-input">Thử nhập một ngày giỗ</label>
+            <input id="gio-input" type="text" autocomplete="off" placeholder="15/8 âm Giỗ ông nội" spellcheck="false">
+            <p class="gio-result" id="gio-result" aria-live="polite"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section wrap" id="man-hinh" aria-labelledby="man-hinh-tieu-de">
+      <div class="section-intro" data-reveal>
+        <h2 class="head" id="man-hinh-tieu-de">Vừa mọi màn hình</h2>
+        <p>Từ máy 3,5 inch đời đầu đến điện thoại 6,7 inch, bố cục tự xếp lại cho vừa. Chọn bảng lịch nhiều thông tin hoặc đồng hồ lật chữ lớn.</p>
+      </div>
+      <div class="show-panel" id="show">
+        <div class="show-demo">
+          <img id="show-img" src="img/screen-board-55.webp" width="1280" height="720" style="--w: 640px" alt="Bảng lịch trên màn hình 5,5 inch, ban ngày">
+        </div>
+        <form class="show-controls" aria-label="Chọn màn hình">
+          <fieldset class="ctl">
+            <legend>Cỡ màn hình</legend>
+            <span class="seg">
+              <input type="radio" name="size" id="s35" value="35"><label for="s35">3,5″</label>
+              <input type="radio" name="size" id="s55" value="55" checked><label for="s55">5,5″</label>
+              <input type="radio" name="size" id="s67" value="67"><label for="s67">6,7″</label>
+            </span>
+          </fieldset>
+          <fieldset class="ctl">
+            <legend>Màn chính</legend>
+            <span class="seg">
+              <input type="radio" name="mode" id="m-board" value="board" checked><label for="m-board">Bảng lịch</label>
+              <input type="radio" name="mode" id="m-flip" value="flip"><label for="m-flip">Đồng hồ lật</label>
+            </span>
+          </fieldset>
+          <div class="ctl">
+            <label class="ctl-name" for="night">Ban đêm</label>
+            <input class="switch" type="checkbox" id="night" name="night">
+          </div>
+          <div class="ctl"><span class="ctl-name">Kích thước</span><span class="ctl-value" id="v-size">640 × 360 dp</span></div>
+          <div class="ctl"><span class="ctl-name">Bố cục</span><span class="ctl-value" id="v-layout">Đồng hồ và một trang</span></div>
+          <div class="ctl"><span class="ctl-name">Màu</span><span class="ctl-value" id="v-light">Ban ngày</span></div>
+          <p class="show-foot"><a class="link" href="https://github.com/traique/nhat-nguyet#readme">Thêm ảnh và mô tả trên GitHub</a></p>
+        </form>
+      </div>
+      <p class="show-note muted">Chọn cỡ gần nhất với chiếc máy bạn định treo lên tường.</p>
+    </section>
+
+    <section class="section wrap" id="to-lich" aria-labelledby="to-lich-tieu-de">
+      <div class="plate" id="plate">
+        <div class="plate-left">
+          <h2 class="head plate-title" id="to-lich-tieu-de" data-reveal><span>Một tờ lịch đủ đầy</span></h2>
+          <ul class="notes notes-left">
+            <li class="note" tabindex="0" style="--top: 150px" data-spot="106 74"><h3>Dương lịch và âm lịch</h3><p>Thứ, ngày tháng, ngày âm và năm can chi, tính theo giờ Việt Nam.</p></li>
+            <li class="note" tabindex="0" style="--top: 250px" data-spot="184 54"><h3>Thời tiết nơi nhà mình</h3><p>Nhiệt độ, trời, báo sắp mưa trong ba giờ tới, dự báo sáu ngày.</p></li>
+          </ul>
+        </div>
+        <figure class="plate-figure">
+          <img src="img/portrait.webp" width="720" height="1280" loading="lazy" alt="Ứng dụng khi dựng đứng: đồng hồ 10:40, ngày dương và âm, thời tiết, bên dưới là tờ lịch ngày 5 tháng 11, 27 tháng Chín âm lịch">
+          <img class="plate-spot" src="img/portrait.webp" width="720" height="1280" loading="lazy" alt="">
+        </figure>
+        <ul class="notes notes-right">
+          <li class="note" tabindex="0" style="--top: 14px" data-spot="14 90"><h3>Giờ to, nhìn từ xa</h3><p>Chữ số chiếm gần hết bề ngang, đọc được từ đầu kia căn phòng.</p></li>
+          <li class="note" tabindex="0" style="--top: 316px" data-spot="318 200"><h3>Tờ lịch như lịch bloc</h3><p>Ngày dương thật lớn, ngày âm đỏ son; ngày được nghỉ theo luật cũng tô đỏ.</p></li>
+          <li class="note" tabindex="0" style="--top: 494px" data-spot="534 62"><h3>Ngày can chi, giờ tốt</h3><p>Ngày hoàng đạo hay hắc đạo và các giờ hoàng đạo trong ngày.</p></li>
+          <li class="note" tabindex="0" style="--top: 590px" data-spot="597 32"><h3>Mỗi ngày một câu ca dao</h3><p>Ba mươi hai câu tục ngữ quen thuộc, đổi theo ngày.</p></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section wrap" id="cac-trang" aria-labelledby="cac-trang-tieu-de">
+      <div class="section-intro" data-reveal>
+        <h2 class="head" id="cac-trang-tieu-de">Các trang trên bảng lịch</h2>
+        <p>Mỗi trang hiện 20 giây rồi chuyển sang trang kế; bật hay tắt từng trang trong Cài đặt. Ngoài các trang dưới đây còn chứng khoán và tin tức từ các báo.</p>
+      </div>
+      <ul class="tiles">
+        <li class="tile" data-reveal>
+          <div class="tile-img"><img src="img/tile-sheet.webp" width="560" height="700" loading="lazy" alt="Tờ lịch: ngày 5 tháng 11 năm 2026, 27 tháng Chín âm lịch, giờ tốt và câu ca dao"></div>
+          <div class="strip"><span class="strip-vals"><span>Âm lịch</span><span>Can chi</span><span>Giờ tốt</span><span>Ca dao</span></span><span class="strip-meta"><span>Mỗi ngày</span><span>Không cần mạng</span></span><span class="strip-name">Tờ lịch</span></div>
+        </li>
+        <li class="tile" data-reveal>
+          <div class="tile-img"><img src="img/tile-month.webp" width="560" height="700" loading="lazy" alt="Lịch tháng 11/2026 có ngày âm dưới mỗi ngày, Chủ nhật và 24/11 tô đỏ"></div>
+          <div class="strip"><span class="strip-vals"><span>Ngày âm</span><span>Ngày nghỉ</span><span>Hoàng đạo</span><span>Ngày giỗ</span></span><span class="strip-meta"><span>Lịch nghỉ 2026–2027</span><span>Luật Lao động</span></span><span class="strip-name">Lịch tháng</span></div>
+        </li>
+        <li class="tile" data-reveal>
+          <div class="tile-img"><img src="img/tile-weather.webp" width="560" height="700" loading="lazy" alt="Dự báo thời tiết theo giờ và sáu ngày, chỉ số chất lượng không khí"></div>
+          <div class="strip"><span class="strip-vals"><span>Theo giờ</span><span>6 ngày</span><span>AQI</span><span>Báo mưa</span></span><span class="strip-meta"><span>15 phút một lần</span><span>Open-Meteo</span></span><span class="strip-name">Dự báo thời tiết</span></div>
+        </li>
+        <li class="tile" data-reveal>
+          <div class="tile-img"><img src="img/tile-gold.webp" width="560" height="700" loading="lazy" alt="Bảng giá vàng SJC, DOJI, PNJ, Bảo Tín và giá thế giới"></div>
+          <div class="strip"><span class="strip-vals"><span>SJC</span><span>DOJI</span><span>PNJ</span><span>Bảo Tín</span></span><span class="strip-meta"><span>10 phút một lần</span><span>vang.today</span></span><span class="strip-name">Giá vàng</span></div>
+        </li>
+        <li class="tile" data-reveal>
+          <div class="tile-img"><img src="img/tile-fuel.webp" width="560" height="700" loading="lazy" alt="Giá xăng dầu vùng 1: E5 RON92, RON95, dầu hỏa, dầu diesel"></div>
+          <div class="strip"><span class="strip-vals"><span>E5</span><span>RON95</span><span>Dầu DO</span><span>Dầu hỏa</span></span><span class="strip-meta"><span>Mỗi giờ</span><span>Giá Petrolimex</span></span><span class="strip-name">Giá xăng dầu</span></div>
+        </li>
+        <li class="tile" data-reveal>
+          <div class="tile-img"><img src="img/tile-fx.webp" width="560" height="700" loading="lazy" alt="Tỷ giá mua bán của mười ngoại tệ tại Vietcombank"></div>
+          <div class="strip"><span class="strip-vals"><span>USD</span><span>EUR</span><span>JPY</span><span>CNY</span></span><span class="strip-meta"><span>30 phút một lần</span><span>Vietcombank</span></span><span class="strip-name">Tỷ giá</span></div>
+        </li>
+        <li class="tile" data-reveal>
+          <div class="tile-img"><img src="img/tile-night.webp" width="560" height="700" loading="lazy" alt="Tờ lịch ban đêm, chữ chuyển tông vàng ấm"></div>
+          <div class="strip"><span class="strip-vals"><span>Tông ấm</span><span>Giảm sáng</span><span>Tắt màn</span><span>Tự bật lại</span></span><span class="strip-meta"><span>Theo giờ ngày, đêm</span><span>Đỡ tốn pin</span></span><span class="strip-name">Ban đêm</span></div>
+        </li>
+        <li class="tile" data-reveal>
+          <div class="tile-img"><img src="img/tile-flip.webp" width="560" height="700" loading="lazy" alt="Cận cảnh thẻ phút của đồng hồ lật ban đêm, bên dưới là dòng âm lịch"></div>
+          <div class="strip"><span class="strip-vals"><span>Giờ</span><span>Ngày âm</span><span>Thời tiết</span><span>Ngày giỗ</span></span><span class="strip-meta"><span>Thay cho bảng lịch</span><span>Hiệu ứng lật thẻ</span></span><span class="strip-name">Đồng hồ lật</span></div>
+        </li>
+      </ul>
+    </section>
+
+    <section class="section wrap" id="cai-dat" aria-labelledby="cai-dat-tieu-de">
+      <div class="section-intro" data-reveal>
+        <h2 class="head" id="cai-dat-tieu-de">Cài trong năm phút</h2>
+      </div>
+      <div class="how">
+        <div class="how-text">
+          <ol class="steps">
+            <li class="step is-active" data-state="1">
+              <h3>Tải tệp APK về chính chiếc máy sẽ treo.</h3>
+              <p>Mở trang này trên điện thoại đó, bấm Tải APK. Tệp nặng khoảng 4 MB; trình duyệt có thể hỏi lại vì đây là tệp cài đặt.</p>
+            </li>
+            <li class="step" data-state="2">
+              <h3>Rồi cho phép cài ứng dụng từ trình duyệt.</h3>
+              <p>Lần đầu, Android hỏi có cho phép cài từ nguồn này không: bật Cho phép. Máy Android 7 trở về trước: Cài đặt › Bảo mật › bật Không rõ nguồn gốc.</p>
+            </li>
+            <li class="step" data-state="3">
+              <h3>Cuối cùng chọn nơi ở, cắm sạc, đặt nằm ngang.</h3>
+              <p>Mở app, nhập thành phố để thời tiết đúng chỗ, rồi cấp quyền tắt màn ban đêm nếu muốn đỡ tốn pin. Giữ lâu vào đồng hồ để mở Cài đặt.</p>
+            </li>
+          </ol>
+        </div>
+        <div class="how-stage">
+          <div class="phone-stage" id="phone-stage" aria-hidden="true">
+            <div class="droid is-on" data-for="1" data-ui>
+              <div class="droid-body">
+                <div class="droid-row"><img src="img/icon.png" alt="" width="40" height="40"><div><p class="droid-title">NhatNguyet-1.0.2.apk</p><p class="droid-text" style="margin-top:2px">Đã tải xong · 3,9 MB</p></div></div>
+                <div class="droid-bar"></div>
+              </div>
+              <div class="droid-actions"><span>Mở</span></div>
+            </div>
+            <div class="droid" data-for="2" data-ui>
+              <div class="droid-body">
+                <div class="droid-row"><img src="img/icon.png" alt="" width="40" height="40"><p class="droid-title">Nhật Nguyệt</p></div>
+                <p class="droid-text">Bạn có muốn cài đặt ứng dụng này không?</p>
+              </div>
+              <div class="droid-actions"><span>Huỷ</span><span>Cài đặt</span></div>
+            </div>
+            <div class="droid" data-for="3" data-ui>
+              <div class="droid-body">
+                <p class="droid-title">Nhà mình ở đâu?</p>
+                <p class="droid-text">Để hiện thời tiết đúng nơi. Sau này đổi trong Cài đặt (hoặc giữ lâu vào đồng hồ). Vuốt dọc trên đồng hồ để chỉnh độ sáng.</p>
+                <p class="droid-field">Hà Nội</p>
+              </div>
+              <div class="droid-actions"><span>Dùng vị trí hiện tại</span><span>Để sau</span><span>Xong</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section wrap" id="hoi-dap" aria-labelledby="hoi-dap-tieu-de">
+      <div class="faq">
+        <h2 id="hoi-dap-tieu-de">Hỏi đáp</h2>
+        <div class="faq-list">
+          <details name="faq" open>
+            <summary>Máy nào dùng được?<span class="plus" aria-hidden="true"></span></summary>
+            <div class="faq-answer"><p>Điện thoại hoặc máy tính bảng Android 4.0.3 trở lên, màn hình từ 3,5 inch. App chạy toàn màn hình, nằm ngang hay dựng đứng đều được. Máy càng cũ càng nên bật Tiết kiệm pin trong Cài đặt.</p></div>
+          </details>
+          <details name="faq">
+            <summary>Có mất tiền, có quảng cáo không?<span class="plus" aria-hidden="true"></span></summary>
+            <div class="faq-answer"><p>Không. App miễn phí, không quảng cáo, không cần tài khoản. Mã nguồn mở theo giấy phép Apache 2.0, ai cũng xem và tự build được.</p></div>
+          </details>
+          <details name="faq">
+            <summary>Dữ liệu lấy từ đâu?<span class="plus" aria-hidden="true"></span></summary>
+            <div class="faq-answer"><p>App lấy thẳng từ nguồn công khai, không qua máy chủ trung gian: thời tiết và không khí từ Open-Meteo, giá vàng từ vang.today, giá xăng Petrolimex qua giaxanghomnay.com, tỷ giá Vietcombank, chứng khoán DNSE và tin tức từ RSS các báo.</p><p>Âm lịch tính ngay trên máy theo thuật toán của Hồ Ngọc Đức nên không cần mạng. Mất mạng thì app vẫn hiện dữ liệu lần gần nhất.</p></div>
+          </details>
+          <details name="faq">
+            <summary>Ngày nào được tô đỏ?<span class="plus" aria-hidden="true"></span></summary>
+            <div class="faq-answer"><p>Chủ nhật và những ngày người lao động được nghỉ hưởng nguyên lương: ngày lễ theo Điều 112 Bộ luật Lao động 2019, Ngày Văn hóa Việt Nam 24/11 (Nghị quyết 28/2026/QH16), nghỉ bù khi lễ trùng cuối tuần, cùng lịch nghỉ Tết và Quốc khánh của khối nhà nước đã công bố cho 2026 và 2027.</p><p>Ngày kỷ niệm như 8/3, 20/11 hay Trung thu chỉ ghi tên, không tô đỏ.</p></div>
+          </details>
+          <details name="faq">
+            <summary>Nhắc ngày giỗ thế nào?<span class="plus" aria-hidden="true"></span></summary>
+            <div class="faq-answer"><p>Vào Cài đặt › Ngày giỗ, thêm từng ngày, ví dụ “15/8 âm Giỗ ông nội” hay “20/11 Sinh nhật mẹ”. Bảng lịch nhắc trước 7 ngày, tờ lịch ghi tên đúng hôm đó, lịch tháng có chấm đỏ. Ngày 30 âm rơi vào tháng thiếu thì tính ngày 29.</p></div>
+          </details>
+          <details name="faq">
+            <summary>Cắm sạc suốt ngày có sao không?<span class="plus" aria-hidden="true"></span></summary>
+            <div class="faq-answer"><p>App hạn chế hao pin và nóng máy: ban đêm tắt màn khi không ai chạm, tự giảm sáng khi pin từ 42°C hoặc còn dưới 20% lúc không sạc, chế độ Tiết kiệm pin gom việc tải dữ liệu 30 phút một lần. Cài đặt có thống kê pin hao bao nhiêu mỗi giờ và nóng nhất bao nhiêu độ.</p><p>Android không cho ứng dụng tự ngắt sạc; muốn giữ pin trong khoảng 40–80% thì dùng ổ cắm hẹn giờ.</p></div>
+          </details>
+          <details name="faq">
+            <summary>App có tự cập nhật không?<span class="plus" aria-hidden="true"></span></summary>
+            <div class="faq-answer"><p>Có, với bản tải ở trang này. Khi có bản mới, dòng dưới cùng của bảng lịch báo “Có bản mới · chạm để cài”. App kiểm tra mã SHA-256 của tệp tải về, và Android chỉ cho cài đè bản có cùng chữ ký.</p></div>
+          </details>
+          <details name="faq">
+            <summary>App xin những quyền gì?<span class="plus" aria-hidden="true"></span></summary>
+            <div class="faq-answer"><p>Mạng để tải dữ liệu; vị trí gần đúng chỉ khi bạn bấm “Dùng vị trí hiện tại”; quản trị thiết bị nếu muốn ban đêm tắt hẳn màn hình (chỉ dùng để tắt màn); hiện trên ứng dụng khác, từ Android 10, để sáng ra tự bật lại.</p><p>App không thu thập hay gửi dữ liệu cá nhân đi đâu. Xem <a class="link" href="https://github.com/traique/nhat-nguyet/blob/main/PRIVACY.md">chính sách quyền riêng tư</a>.</p></div>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="ft ft-statement">
+      <p>Lịch treo tường cho chiếc điện thoại cũ trong ngăn kéo.</p>
+      <p class="ft-legal">© 2025–2026 LCTA và những người đóng góp · Mã nguồn mở Apache 2.0 · Font Inter (SIL OFL)</p>
+    </div>
+    <nav class="ft ft-nav" aria-label="Liên kết">
+      <ul>
+        <li><a href="https://github.com/traique/nhat-nguyet">Mã nguồn</a></li>
+        <li><a href="https://github.com/traique/nhat-nguyet/blob/main/CHANGELOG.md">Nhật ký thay đổi</a></li>
+        <li><a href="https://github.com/traique/nhat-nguyet/blob/main/PRIVACY.md">Quyền riêng tư</a></li>
+        <li><a href="https://github.com/traique/nhat-nguyet/releases">Các bản đã phát hành</a></li>
+      </ul>
+    </nav>
+    <div class="ft ft-time">
+      <p>Giờ Việt Nam</p>
+      <p class="ft-clock" id="ft-clock">Âm lịch hôm nay</p>
+    </div>
+    <div class="ft ft-help">
+      <p class="muted">Gặp lỗi hay muốn góp ý?</p>
+      <a class="link" href="https://github.com/traique/nhat-nguyet/issues">Viết trên GitHub</a>
+    </div>
+    <div class="ft ft-mark" aria-hidden="true"><p>Nhật Nguyệt</p></div>
+    <a class="ft ft-cta" href="https://github.com/traique/nhat-nguyet/releases/latest" data-apk-plain>
+      <span>Tải APK về máy</span>
+      <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="4" aria-hidden="true"><path d="M12 36 36 12M16 12h20v20"/></svg>
+    </a>
+  </footer>
+</body>
+</html>
