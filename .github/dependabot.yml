@@ -4,7 +4,24 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    # Gom mọi action vào một PR mỗi tháng.
+    groups:
+      actions:
+        patterns: ['*']
   - package-ecosystem: gradle
     directory: /
     schedule:
       interval: monthly
+    groups:
+      gradle:
+        patterns: ['*']
+    ignore:
+      # Conscrypt chỉ dùng để Android 4.x có TLS mới; từ 2.6 thư viện đòi Android 5 (minSdk 21), app không build được.
+      - dependency-name: org.conscrypt:conscrypt-android
+        versions: ['>= 2.6']
+      # Android Gradle Plugin và Gradle bản lớn (AGP 9 đòi Gradle 9.6, đổi DSL) nâng cùng nhau bằng tay,
+      # thử trên máy API 15 trước; Dependabot chỉ đề xuất bản vá và bản nhỏ.
+      - dependency-name: com.android.application
+        update-types: ['version-update:semver-major']
+      - dependency-name: gradle-wrapper
+        update-types: ['version-update:semver-major']
