@@ -30,12 +30,23 @@ public final class Prefs {
             "Âm lịch chi tiết và ngày lễ sắp tới", "Dự báo thời tiết", "Giá vàng", "Giá xăng dầu", "Tỷ giá Vietcombank",
             "Chứng khoán", "Tin tức"};
 
+    /** Trang bật sẵn lần đầu: đủ cho lịch treo tường gia đình; chứng khoán, tin tức bật thêm trong Cài đặt. */
+    public static final String[] DEFAULT_PAGES = {"sheet", "month", "weather", "gold", "fuel"};
+
     public static final String DEFAULT_WATCHLIST = "VNINDEX,VN30,FPT,VCB,HPG,MWG";
+    /** Nguồn tin có tên, chọn bằng ô tick trong Cài đặt: {tên, địa chỉ RSS}. */
+    public static final String[][] FEED_CHOICES = {
+            {"Tuổi Trẻ", "https://tuoitre.vn/rss/tin-moi-nhat.rss"},
+            {"VnExpress", "https://vnexpress.net/rss/tin-moi-nhat.rss"},
+            {"Thanh Niên", "https://thanhnien.vn/rss/home.rss"},
+            {"Dân Trí", "https://dantri.com.vn/rss/home.rss"},
+            {"VnExpress Kinh doanh", "https://vnexpress.net/rss/kinh-doanh.rss"},
+            {"CafeF Chứng khoán", "https://cafef.vn/thi-truong-chung-khoan.rss"},
+            {"GenK Công nghệ", "https://genk.vn/rss/home.rss"},
+    };
     public static final String[] DEFAULT_FEEDS = {
             "https://tuoitre.vn/rss/tin-moi-nhat.rss",
-            "https://vnexpress.net/rss/kinh-doanh.rss",
-            "https://cafef.vn/thi-truong-chung-khoan.rss",
-            "https://genk.vn/rss/home.rss",
+            "https://vnexpress.net/rss/tin-moi-nhat.rss",
     };
 
     private final SharedPreferences sp;
@@ -83,8 +94,10 @@ public final class Prefs {
         return sp.getString("watchlist", DEFAULT_WATCHLIST);
     }
 
+    /** Để trống thì quay về danh sách mặc định. */
     public void setWatchlist(String v) {
-        sp.edit().putString("watchlist", v).apply();
+        if (v == null || v.trim().length() == 0) sp.edit().remove("watchlist").apply();
+        else sp.edit().putString("watchlist", v.trim()).apply();
     }
 
     public List<String> feeds() {
@@ -96,9 +109,14 @@ public final class Prefs {
         }
         for (String line : raw.split("\n")) {
             String t = line.trim();
-            if (t.startsWith("http")) out.add(t);
+            if (isFeedUrl(t)) out.add(t);
         }
         return out;
+    }
+
+    /** Chỉ nhận địa chỉ https (Android 9+ chặn http thường; máy cũ cũng nên tránh). */
+    public static boolean isFeedUrl(String t) {
+        return t.startsWith("https://") && t.length() > 10 && !t.contains(" ");
     }
 
     public String feedsRaw() {
@@ -111,8 +129,19 @@ public final class Prefs {
         return sb.toString();
     }
 
+    /** Để trống thì quay về danh sách mặc định. */
     public void setFeeds(String v) {
-        sp.edit().putString("feeds", v).apply();
+        if (v == null || v.trim().length() == 0) sp.edit().remove("feeds").apply();
+        else sp.edit().putString("feeds", v.trim()).apply();
+    }
+
+    public void setFeeds(List<String> urls) {
+        StringBuilder sb = new StringBuilder();
+        for (String u : urls) {
+            if (sb.length() > 0) sb.append('\n');
+            sb.append(u);
+        }
+        setFeeds(sb.toString());
     }
 
     /** Ngày riêng (giỗ, sinh nhật), mỗi dòng một ngày, vd "15/8 âm Giỗ ông nội". */
@@ -188,7 +217,10 @@ public final class Prefs {
 
     public boolean pageEnabled(String key) {
         String raw = sp.getString("pages", null);
-        if (raw == null) return true;
+        if (raw == null) {
+            for (String k : DEFAULT_PAGES) if (k.equals(key)) return true;
+            return false;
+        }
         for (String s : raw.split(",")) if (s.equals(key)) return true;
         return false;
     }
@@ -196,7 +228,7 @@ public final class Prefs {
     public List<String> enabledPages() {
         List<String> out = new ArrayList<String>();
         for (String k : PAGE_KEYS) if (pageEnabled(k)) out.add(k);
-        if (out.isEmpty()) out.add("month");
+        if (out.isEmpty()) out.add("sheet");
         return out;
     }
 
@@ -234,9 +266,33 @@ public final class Prefs {
         return sp.getBoolean("auto_update", true);
     }
 
-    /** Giờ tự mở màn hình cài bản mới (-1 = không tự mở). */
+    /** Giờ tự mở màn hình cài bản mới: cố định 10 giờ sáng (có người ở nhà, máy đã sáng). */
     public int updateInstallHour() {
-        return sp.getInt("update_install_hour", 10);
+        return 10;
+    }
+
+    // ------------------------------------------------------------ lần đầu dùng
+
+    /** Đã hỏi nơi ở lần đầu mở app chưa. */
+    public boolean setupDone() {
+        return sp.getBoolean("setup_done", false) || sp.getBoolean("hint_shown", false);
+    }
+
+    public void setSetupDone() {
+        sp.edit().putBoolean("setup_done", true).apply();
+    }
+
+    /** Khoá PIN: số lần nhập sai liên tiếp và mốc được thử lại. */
+    public int pinFails() {
+        return sp.getInt("pin_fails", 0);
+    }
+
+    public long pinLockUntil() {
+        return sp.getLong("pin_lock_until", 0);
+    }
+
+    public void setPinFails(int fails, long lockUntil) {
+        sp.edit().putInt("pin_fails", fails).putLong("pin_lock_until", lockUntil).apply();
     }
 
     public long lastUpdateCheck() {
@@ -255,6 +311,10 @@ public final class Prefs {
 
     public boolean checkSettingsPin(String pin) {
         return hashPin(pin).equals(sp.getString("settings_pin", ""));
+    }
+
+    public void setPersonalDays(String text) {
+        sp.edit().putString("personal_days", text == null ? "" : text.trim()).apply();
     }
 
     /** null = bỏ khoá. Chỉ lưu mã băm, không lưu mã PIN gốc. */

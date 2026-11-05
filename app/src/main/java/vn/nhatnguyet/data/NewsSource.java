@@ -169,7 +169,7 @@ public final class NewsSource extends Source {
                 String n = p.getName();
                 if (cur != null && ("item".equalsIgnoreCase(n) || "entry".equalsIgnoreCase(n))) {
                     if (cur.title != null && cur.title.length() > 0) {
-                        if (cur.time == 0) cur.time = System.currentTimeMillis() - 3600_000L;
+                        // Không có ngày: giữ 0, hiện không kèm "… trước" và xếp sau tin có ngày.
                         out.add(cur);
                     }
                     cur = null;

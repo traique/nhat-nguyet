@@ -22,11 +22,14 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.text.Editable;
+import android.text.Html;
 import android.text.InputType;
 import android.text.TextWatcher;
+import android.text.method.LinkMovementMethod;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -39,6 +42,7 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -58,11 +62,18 @@ import vn.nhatnguyet.sys.Scheduler;
 import vn.nhatnguyet.sys.WakeService;
 import vn.nhatnguyet.update.Updater;
 
-/** Màn Cài đặt dựng bằng code (chạy được trên Android 4.0.3 với giao diện Holo). */
+/**
+ * Màn Cài đặt dựng bằng code (chạy được trên Android 4.0.3 với giao diện Holo).
+ * Phần hay dùng nằm trên, phần ít dùng gom vào nhóm "Nâng cao" thu gọn. Tự lưu khi rời màn.
+ */
 public class SettingsActivity extends Activity implements Updater.Listener {
+    /** Mở Cài đặt và bấm luôn "Dùng vị trí hiện tại" (hộp thoại lần đầu của bảng lịch). */
+    public static final String EXTRA_LOCATE = "locate";
+    public static final String REPO_URL = "https://github.com/traique/nhat-nguyet";
     private static final int REQ_ADMIN = 7;
     private static final int REQ_LOCATION = 8;
     private static final int ACCENT = 0xFF5FD3B0;
+    private static final int PREVIEW_DELAY_MS = 300;
 
     private Prefs prefs;
     private Updater updater;
@@ -70,17 +81,21 @@ public class SettingsActivity extends Activity implements Updater.Listener {
     private float density;
 
     private EditText place, watchlist, feeds, personalDays;
-    private TextView placeState, personalState, adminState, updateState, versionText;
-    private Button adminButton, installButton, pinButton, pinRemove;
-    private CheckBox alwaysOn, burnIn, warmNight, proximity, proximitySleep, wakeMorning, autoStart, autoUpdate;
+    private TextView placeState, personalState, updateState, versionText, versionDetail;
+    private Button installButton, pinButton, pinRemove;
+    private CheckBox alwaysOn, burnIn, warmNight, proximity, proximitySleep, wakeMorning, autoStart, autoUpdate, flipInfo;
     private RadioGroup layoutGroup, nightGroup, displayGroup;
-    private CheckBox flipInfo;
-    private Slider rotate, fontScale, dayStart, dayEnd, idle, nightBright, dayBright, installHour;
+    private Slider rotate, fontScale, dayStart, dayEnd, idle, nightBright, dayBright;
     private final List<CheckBox> pageChecks = new ArrayList<CheckBox>();
+    private final List<CheckBox> feedChecks = new ArrayList<CheckBox>();
+    private final List<StatusRow> statusRows = new ArrayList<StatusRow>();
+    private LinearLayout advancedBox;
+    private TextView advancedToggle;
     private boolean geocoding;
     private LocationManager locationManager;
     private LocationListener locationListener;
     private Runnable locateTimeout;
+    private Runnable previewRun;
     private boolean firstSection = true;
 
     @Override
@@ -91,6 +106,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         density = getResources().getDisplayMetrics().density;
         setContentView(build());
         load();
+        if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_LOCATE, false)) useCurrentLocation();
     }
 
     @Override
@@ -109,7 +125,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
     @Override
     protected void onPause() {
         updater.removeListener(this);
-        save(false);
+        save();
         super.onPause();
     }
 
@@ -129,13 +145,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(20), dp(4), dp(20), dp(40));
 
-        section(root, "Màn hình chính");
-        displayGroup = radios(root, 300, new String[]{
-                "Bảng lịch đầy đủ",
-                "Chỉ đồng hồ lật cỡ lớn"});
-        flipInfo = check(root, "Dưới đồng hồ lật hiện ngày, âm lịch và thời tiết");
-
-        section(root, "Thời tiết");
+        section(root, "Nơi ở");
         LinearLayout placeRow = new LinearLayout(this);
         placeRow.setOrientation(LinearLayout.HORIZONTAL);
         placeRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -143,6 +153,14 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         place.setHint("Thành phố, vd Hà Nội, Đà Nẵng");
         place.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         place.setSingleLine(true);
+        place.setImeOptions(EditorInfo.IME_ACTION_SEARCH | EditorInfo.IME_FLAG_NO_EXTRACT_UI | EditorInfo.IME_FLAG_NO_FULLSCREEN);
+        place.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, android.view.KeyEvent event) {
+                geocode(true);
+                return true;
+            }
+        });
         placeRow.addView(place, new LinearLayout.LayoutParams(0, -2, 1f));
         Button find = plainButton("Tìm", new Runnable() {
             @Override
@@ -161,15 +179,20 @@ public class SettingsActivity extends Activity implements Updater.Listener {
             }
         });
         placeState = note(root, "");
-        note(root, "Vị trí chỉ dùng để lấy thời tiết; tên nơi tra từ OpenStreetMap.");
+        note(root, "Nơi ở chỉ dùng để lấy thời tiết và chất lượng không khí.");
 
         section(root, "Ngày giỗ, sinh nhật");
-        note(root, "Mỗi dòng một ngày: ngày/tháng, thêm chữ \"âm\" nếu tính theo âm lịch, rồi đến tên. "
-                + "Bảng lịch nhắc trước 7 ngày và đánh dấu chấm đỏ trên lịch tháng.");
+        note(root, "Bảng lịch nhắc trước 7 ngày và đánh dấu chấm đỏ trên lịch tháng.");
+        button(root, "+ Thêm ngày", new Runnable() {
+            @Override
+            public void run() {
+                askNewPersonalDay();
+            }
+        });
         personalDays = input(root, "15/8 âm Giỗ ông nội\n20/11 Sinh nhật mẹ", InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         personalDays.setSingleLine(false);
-        personalDays.setMinLines(3);
+        personalDays.setMinLines(2);
         personalState = note(root, "");
         personalDays.addTextChangedListener(new TextWatcher() {
             @Override
@@ -181,12 +204,21 @@ public class SettingsActivity extends Activity implements Updater.Listener {
             }
 
             @Override
-            public void afterTextChanged(Editable e) {
-                showPersonalDays(e.toString());
+            public void afterTextChanged(final Editable e) {
+                // Mỗi phím gõ tính lại âm lịch cho mọi mục: chờ người dùng gõ xong một nhịp.
+                if (previewRun != null) handler.removeCallbacks(previewRun);
+                previewRun = new Runnable() {
+                    @Override
+                    public void run() {
+                        showPersonalDays(personalDays.getText().toString());
+                    }
+                };
+                handler.postDelayed(previewRun, PREVIEW_DELAY_MS);
             }
         });
+        note(root, "Mỗi dòng một ngày: ngày/tháng, chữ \"âm\" nếu theo âm lịch, rồi tên. Có thể ghi cả năm.");
 
-        section(root, "Trang thông tin");
+        section(root, "Trang hiển thị");
         note(root, "Các trang xoay vòng bên phải bảng lịch. Chạm để sang trang, vuốt ngang để tiến hoặc lùi.");
         for (int i = 0; i < Prefs.PAGE_KEYS.length; i++) {
             CheckBox c = check(root, Prefs.PAGE_NAMES[i]);
@@ -199,8 +231,6 @@ public class SettingsActivity extends Activity implements Updater.Listener {
                 return v + " giây";
             }
         });
-        label(root, "Bố cục");
-        layoutGroup = radios(root, 100, new String[]{"Tự động theo kích thước máy", "Luôn 2 cột", "3 cột (máy màn dài từ 6 inch)"});
         fontScale = new Slider(root, "Cỡ chữ", 70, 160, 5, new Label() {
             @Override
             public String of(int v) {
@@ -222,106 +252,96 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         label(root, "Ban đêm");
         nightGroup = radios(root, 200, new String[]{
                 "Chỉ giảm độ sáng, màn vẫn sáng",
-                "Tắt theo thời gian chờ của máy khi không chạm",
-                "Tắt hẳn màn hình khi không chạm (cần quyền quản trị)"});
-        idle = new Slider(root, "Tắt sau khi không chạm", 1, 60, 1, new Label() {
+                "Tắt màn hình khi không ai chạm"});
+        nightGroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
             @Override
-            public String of(int v) {
-                return v + " phút";
+            public void onCheckedChanged(RadioGroup group, int checkedId) {
+                if (checkedId == 201 && !AdminReceiver.isActive(SettingsActivity.this)) askAdmin();
             }
         });
-        nightBright = new Slider(root, "Độ sáng ban đêm", 1, 100, 1, new Label() {
-            @Override
-            public String of(int v) {
-                return v + "%";
-            }
-        });
-        dayBright = new Slider(root, "Độ sáng ban ngày", 0, 100, 5, new Label() {
-            @Override
-            public String of(int v) {
-                return v == 0 ? "Theo máy" : v + "%";
-            }
-        });
-        warmNight = check(root, "Ban đêm chuyển chữ sang tông ấm (bớt ánh sáng xanh)");
-        burnIn = check(root, "Chống lưu ảnh: dịch nội dung vài điểm ảnh mỗi 2 phút");
-        adminButton = button(root, "", new Runnable() {
-            @Override
-            public void run() {
-                toggleAdmin();
-            }
-        });
-        adminState = note(root, "");
-        note(root, "\"Tắt theo thời gian chờ\" dùng thời gian chờ màn hình của máy (Cài đặt > Màn hình), nên đặt 15–30 giây. "
+        note(root, "Tắt màn hình cần quyền quản trị thiết bị (xin ngay khi chọn). Chưa có quyền thì màn tối đen "
+                + "rồi tự tắt theo thời gian chờ của máy, nên đặt thời gian chờ khoảng 15–30 giây. "
                 + "Để bảng tự hiện lại khi bật màn, đặt khoá màn hình là \"Không\" hoặc \"Vuốt\".");
 
-        section(root, "Đánh thức và tự chạy");
+        section(root, "Để lịch tự bật lại");
         proximity = check(root, "Vẫy tay qua cảm biến tiệm cận để bật màn hình");
         proximitySleep = check(root, "Che cảm biến khi màn đang sáng để tắt màn hình");
-        note(root, sensorInfo());
-        note(root, "Có quyền quản trị thiết bị (mục Ngày và đêm) thì màn tắt ngay; chưa có thì màn tối đen "
-                + "rồi tự tắt theo thời gian chờ của máy. Chạm màn hình hoặc che cảm biến lần nữa để bật lại.");
         wakeMorning = check(root, "Tự bật màn hình lúc bắt đầu giờ ngày");
         autoStart = check(root, "Tự mở bảng lịch khi khởi động máy");
+        note(root, sensorInfo());
+        label(root, "Quyền cần cấp (chạm dòng chưa có ✓)");
         if (Build.VERSION.SDK_INT >= 23) {
-            button(root, "Cho app chạy nền (tắt tối ưu pin)", new Runnable() {
-                @Override
-                public void run() {
-                    askIgnoreBattery();
-                }
-            });
-            button(root, "Cho phép hiện trên ứng dụng khác (để tự bật lại)", new Runnable() {
+            statusRows.add(new StatusRow(root, "Hiện trên ứng dụng khác (để tự bật lại trên Android 10 trở lên)", new Runnable() {
                 @Override
                 public void run() {
                     askOverlay();
                 }
-            });
+            }));
+            statusRows.add(new StatusRow(root, "Chạy nền, không bị tối ưu pin", new Runnable() {
+                @Override
+                public void run() {
+                    askIgnoreBattery();
+                }
+            }));
         }
         if (Build.VERSION.SDK_INT >= 33) {
-            button(root, "Cho phép thông báo của dịch vụ đánh thức", new Runnable() {
+            statusRows.add(new StatusRow(root, "Thông báo của dịch vụ đánh thức", new Runnable() {
                 @Override
                 public void run() {
                     askNotifications();
                 }
-            });
+            }));
         }
+        statusRows.add(new StatusRow(root, "Tắt màn hình (quản trị thiết bị)", new Runnable() {
+            @Override
+            public void run() {
+                toggleAdmin();
+            }
+        }));
         note(root, "Samsung, Xiaomi, Oppo: thêm Nhật Nguyệt vào danh sách được chạy nền và tự khởi động trong phần quản lý pin của máy.");
 
-        section(root, "Chứng khoán và tin tức");
-        label(root, "Mã theo dõi, cách nhau dấu phẩy");
-        watchlist = input(root, Prefs.DEFAULT_WATCHLIST, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
-                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        note(root, "Chỉ số: VNINDEX, VN30, HNX, HNX30, UPCOM.");
-        label(root, "Nguồn tin RSS, mỗi dòng một đường dẫn");
-        feeds = input(root, "https://…", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI
-                | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        feeds.setSingleLine(false);
-        feeds.setMinLines(3);
-        feeds.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        section(root, "Màn hình chính");
+        displayGroup = radios(root, 300, new String[]{
+                "Bảng lịch đầy đủ",
+                "Chỉ đồng hồ lật cỡ lớn"});
+        flipInfo = check(root, "Dưới đồng hồ lật hiện ngày, âm lịch và thời tiết");
+        displayGroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(RadioGroup group, int checkedId) {
+                flipInfo.setVisibility(checkedId == 301 ? View.VISIBLE : View.GONE);
+            }
+        });
 
-        section(root, "Cập nhật");
-        autoUpdate = check(root, "Tự kiểm tra và tải bản mới");
-        installHour = new Slider(root, "Tự mở màn hình cài bản mới lúc", -1, 23, 1, new Label() {
-            @Override
-            public String of(int v) {
-                return v < 0 ? "Không tự mở" : v + ":00";
+        section(root, "Tin tức");
+        note(root, "Bật trang Tin tức ở mục Trang hiển thị rồi chọn báo.");
+        for (String[] f : Prefs.FEED_CHOICES) {
+            CheckBox c = check(root, f[0]);
+            c.setTag(f[1]);
+            feedChecks.add(c);
+        }
+
+        if (BuildConfig.OTA) {
+            section(root, "Cập nhật");
+            autoUpdate = check(root, "Tự kiểm tra và tải bản mới từ GitHub");
+            button(root, "Kiểm tra cập nhật ngay", new Runnable() {
+                @Override
+                public void run() {
+                    save();
+                    updater.check();
+                }
+            });
+            installButton = button(root, "Cài bản mới", new Runnable() {
+                @Override
+                public void run() {
+                    updater.install(SettingsActivity.this);
+                }
+            });
+            updateState = note(root, "");
+            if (Build.VERSION.SDK_INT < 26) {
+                note(root, "Lần đầu cần bật: Cài đặt > Bảo mật > Nguồn không xác định. Mỗi lần cập nhật cần bấm \"Cài đặt\" một lần.");
+            } else {
+                note(root, "Bản mới tải xong sẽ mời cài lúc 10 giờ sáng, hoặc chạm dòng trạng thái trên bảng lịch.");
             }
-        });
-        button(root, "Kiểm tra cập nhật ngay", new Runnable() {
-            @Override
-            public void run() {
-                save(false);
-                updater.check();
-            }
-        });
-        installButton = button(root, "Cài bản mới", new Runnable() {
-            @Override
-            public void run() {
-                updater.install(SettingsActivity.this);
-            }
-        });
-        updateState = note(root, "");
-        if (Build.VERSION.SDK_INT < 26) {
-            note(root, "Lần đầu cần bật: Cài đặt > Bảo mật > Nguồn không xác định. Mỗi lần cập nhật cần bấm \"Cài đặt\" một lần.");
         }
 
         section(root, "Khoá Cài đặt");
@@ -342,7 +362,90 @@ public class SettingsActivity extends Activity implements Updater.Listener {
             }
         });
 
+        // ---- Nâng cao: thu gọn, ít khi cần chỉnh
+        section(root, "Nâng cao");
+        advancedToggle = note(root, "");
+        advancedToggle.setAlpha(1f);
+        advancedToggle.setTextColor(ACCENT);
+        advancedToggle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        advancedToggle.setMinHeight(dp(44));
+        advancedToggle.setGravity(Gravity.CENTER_VERTICAL);
+        advancedBox = new LinearLayout(this);
+        advancedBox.setOrientation(LinearLayout.VERTICAL);
+        advancedBox.setVisibility(View.GONE);
+        root.addView(advancedBox, new LinearLayout.LayoutParams(-1, -2));
+        advancedToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                boolean open = advancedBox.getVisibility() != View.VISIBLE;
+                advancedBox.setVisibility(open ? View.VISIBLE : View.GONE);
+                advancedToggle.setText(open ? "▾ Ẩn bớt" : "▸ Độ sáng, bố cục, chứng khoán, nguồn RSS khác, thoát bảng lịch");
+            }
+        });
+        advancedToggle.setText("▸ Độ sáng, bố cục, chứng khoán, nguồn RSS khác, thoát bảng lịch");
+        buildAdvanced(advancedBox);
+
         section(root, "Giới thiệu");
+        buildAbout(root);
+
+        ScrollView sv = new ScrollView(this);
+        sv.setFitsSystemWindows(true); // Android 15+: không bị thanh trạng thái, thanh điều hướng che
+        sv.addView(root);
+        return sv;
+    }
+
+    private void buildAdvanced(LinearLayout box) {
+        label(box, "Độ sáng");
+        note(box, "Vuốt lên hoặc xuống trên đồng hồ cũng chỉnh được độ sáng.");
+        dayBright = new Slider(box, "Độ sáng ban ngày", 0, 100, 5, new Label() {
+            @Override
+            public String of(int v) {
+                return v == 0 ? "Theo máy" : v + "%";
+            }
+        });
+        nightBright = new Slider(box, "Độ sáng ban đêm", 1, 100, 1, new Label() {
+            @Override
+            public String of(int v) {
+                return v + "%";
+            }
+        });
+        idle = new Slider(box, "Ban đêm, tắt màn sau khi không chạm", 1, 60, 1, new Label() {
+            @Override
+            public String of(int v) {
+                return v + " phút";
+            }
+        });
+        warmNight = check(box, "Ban đêm chuyển chữ sang tông ấm (bớt ánh sáng xanh)");
+        burnIn = check(box, "Chống lưu ảnh: dịch nội dung vài điểm ảnh mỗi 2 phút");
+
+        label(box, "Bố cục");
+        layoutGroup = radios(box, 100, new String[]{"Tự động theo kích thước máy", "Luôn 2 cột", "3 cột (máy màn dài từ 6 inch)"});
+
+        label(box, "Chứng khoán: mã theo dõi, cách nhau dấu phẩy");
+        watchlist = input(box, Prefs.DEFAULT_WATCHLIST, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        note(box, "Chỉ số: VNINDEX, VN30, HNX, HNX30, UPCOM. Để trống thì dùng danh sách mặc định. "
+                + "Số liệu lấy từ DNSE/Entrade, chỉ để tham khảo.");
+
+        label(box, "Nguồn tin RSS khác, mỗi dòng một địa chỉ https://");
+        feeds = input(box, "https://…", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI
+                | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        feeds.setSingleLine(false);
+        feeds.setMinLines(2);
+
+        label(box, "Khác");
+        versionDetail = note(box, "");
+        button(box, "Thoát bảng lịch", new Runnable() {
+            @Override
+            public void run() {
+                MainActivity.exitRequested = true;
+                finish();
+            }
+        });
+        note(box, "Phím Back trên bảng lịch bị chặn để không thoát nhầm; dùng nút này khi cần đóng app.");
+    }
+
+    private void buildAbout(LinearLayout root) {
         LinearLayout about = new LinearLayout(this);
         about.setOrientation(LinearLayout.HORIZONTAL);
         about.setGravity(Gravity.CENTER_VERTICAL);
@@ -359,11 +462,11 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         name.setTypeface(Typeface.DEFAULT_BOLD);
         info.addView(name);
         versionText = new TextView(this);
-        versionText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        versionText.setAlpha(0.75f);
+        versionText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        versionText.setAlpha(0.8f);
         info.addView(versionText);
         TextView credit = new TextView(this);
-        credit.setText("design by LCTA");
+        credit.setText("design by LCTA · mã nguồn mở, giấy phép Apache 2.0");
         credit.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         credit.setAlpha(0.6f);
         info.addView(credit);
@@ -371,20 +474,25 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, -2);
         ap.topMargin = dp(8);
         root.addView(about, ap);
-        note(root, "Trên bảng lịch: bấm biểu tượng bánh răng ở góc trên bên phải (hoặc giữ lâu vào đồng hồ) để mở lại trang này.");
 
-        Button saveBtn = button(root, "Lưu và đóng", new Runnable() {
+        TextView credits = note(root, "");
+        credits.setText(Html.fromHtml("Lịch âm theo thuật toán của Hồ Ngọc Đức. "
+                + "Thời tiết, không khí: <a href=\"https://open-meteo.com/\">Open-Meteo.com</a> (CC BY 4.0). "
+                + "Tên nơi theo vị trí: © <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors (ODbL). "
+                + "Giá vàng: vang.today · Xăng dầu: giaxanghomnay.com · Tỷ giá: Vietcombank · Chứng khoán: DNSE/Entrade (tham khảo) · "
+                + "Tin tức: RSS của các báo.<br>"
+                + "<a href=\"" + REPO_URL + "/blob/main/PRIVACY.md\">Quyền riêng tư</a> · "
+                + "<a href=\"" + REPO_URL + "\">Mã nguồn</a>"));
+        credits.setMovementMethod(LinkMovementMethod.getInstance());
+        credits.setLinkTextColor(ACCENT);
+        button(root, "Giấy phép bên thứ ba", new Runnable() {
             @Override
             public void run() {
-                save(true);
-                finish();
+                showNotice();
             }
         });
-        ((LinearLayout.LayoutParams) saveBtn.getLayoutParams()).topMargin = dp(24);
-
-        ScrollView sv = new ScrollView(this);
-        sv.addView(root);
-        return sv;
+        note(root, "Trên bảng lịch: bấm biểu tượng bánh răng ở góc trên bên phải (hoặc giữ lâu vào đồng hồ) để mở lại trang này. "
+                + "Cài đặt tự lưu khi rời trang.");
     }
 
     private void section(LinearLayout root, String s) {
@@ -419,8 +527,8 @@ public class SettingsActivity extends Activity implements Updater.Listener {
     private TextView note(LinearLayout root, String s) {
         TextView t = new TextView(this);
         t.setText(s);
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f);
-        t.setAlpha(0.72f);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        t.setAlpha(0.78f);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.topMargin = dp(4);
         root.addView(t, lp);
@@ -432,6 +540,8 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         e.setHint(hint);
         e.setInputType(type);
         if ((type & InputType.TYPE_TEXT_FLAG_MULTI_LINE) == 0) e.setSingleLine(true);
+        // Màn ngang nhỏ: không cho bàn phím chiếm toàn màn hình che mất phần xem trước.
+        e.setImeOptions(e.getImeOptions() | EditorInfo.IME_FLAG_NO_EXTRACT_UI | EditorInfo.IME_FLAG_NO_FULLSCREEN);
         root.addView(e, new LinearLayout.LayoutParams(-1, -2));
         return e;
     }
@@ -440,8 +550,9 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         CheckBox c = new CheckBox(this);
         c.setText(s);
         c.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        c.setMinHeight(dp(48));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-        lp.topMargin = dp(6);
+        lp.topMargin = dp(2);
         root.addView(c, lp);
         return c;
     }
@@ -454,7 +565,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
             b.setId(baseId + i);
             b.setText(labels[i]);
             b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-            b.setMinHeight(dp(44));
+            b.setMinHeight(dp(48));
             g.addView(b);
         }
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
@@ -488,6 +599,34 @@ public class SettingsActivity extends Activity implements Updater.Listener {
 
     private interface Label {
         String of(int v);
+    }
+
+    /** Dòng trạng thái quyền: ✓ hoặc ✗ ở đầu, chạm để cấp. */
+    private final class StatusRow {
+        final TextView view;
+        boolean ok;
+
+        StatusRow(LinearLayout root, final String title, final Runnable action) {
+            view = new TextView(SettingsActivity.this);
+            view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+            view.setMinHeight(dp(48));
+            view.setGravity(Gravity.CENTER_VERTICAL);
+            view.setText(title);
+            view.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    action.run();
+                }
+            });
+            root.addView(view, new LinearLayout.LayoutParams(-1, -2));
+            set(false, title);
+        }
+
+        void set(boolean ok, String title) {
+            this.ok = ok;
+            view.setText((ok ? "✓  " : "✗  ") + title);
+            view.setTextColor(ok ? ACCENT : 0xFFF2645A);
+        }
     }
 
     /** Thanh trượt có giá trị hiện ngay bên phải tên (SeekBar API 15 không có setMin nên tự cộng lệch). */
@@ -554,11 +693,28 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         place.setText(prefs.placeName());
         placeState.setText(placeLabel());
         watchlist.setText(prefs.watchlistRaw());
-        feeds.setText(prefs.feedsRaw());
+        List<String> feedUrls = prefs.feeds();
+        StringBuilder other = new StringBuilder();
+        for (String u : feedUrls) {
+            boolean known = false;
+            for (CheckBox c : feedChecks) {
+                if (u.equals(c.getTag())) {
+                    c.setChecked(true);
+                    known = true;
+                }
+            }
+            if (!known) {
+                if (other.length() > 0) other.append('\n');
+                other.append(u);
+            }
+        }
+        feeds.setText(other.toString());
         personalDays.setText(prefs.personalDaysRaw());
+        showPersonalDays(prefs.personalDaysRaw());
         for (CheckBox c : pageChecks) c.setChecked(prefs.pageEnabled((String) c.getTag()));
         displayGroup.check(prefs.clockOnly() ? 301 : 300);
         flipInfo.setChecked(prefs.flipInfo());
+        flipInfo.setVisibility(prefs.clockOnly() ? View.VISIBLE : View.GONE);
         rotate.set(prefs.rotateSeconds());
         String l = prefs.layout();
         layoutGroup.check(Prefs.LAYOUT_2.equals(l) ? 101 : Prefs.LAYOUT_3.equals(l) ? 102 : 100);
@@ -566,8 +722,8 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         alwaysOn.setChecked(prefs.alwaysOn());
         dayStart.set(prefs.dayStart());
         dayEnd.set(prefs.dayEnd());
-        String n = prefs.nightMode();
-        nightGroup.check(Prefs.NIGHT_DIM.equals(n) ? 200 : Prefs.NIGHT_OFF.equals(n) ? 202 : 201);
+        // "Tắt theo thời gian chờ" (bản cũ) và "Tắt hẳn" nay là một lựa chọn: tắt được thì tắt, không thì chờ máy.
+        nightGroup.check(Prefs.NIGHT_DIM.equals(prefs.nightMode()) ? 200 : 201);
         idle.set(prefs.idleMinutes());
         nightBright.set(prefs.nightBrightness());
         dayBright.set(prefs.dayBrightness());
@@ -577,8 +733,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         proximitySleep.setChecked(prefs.proximitySleep());
         wakeMorning.setChecked(prefs.wakeMorning());
         autoStart.setChecked(prefs.autoStart());
-        autoUpdate.setChecked(prefs.autoUpdate());
-        installHour.set(prefs.updateInstallHour());
+        if (autoUpdate != null) autoUpdate.setChecked(prefs.autoUpdate());
     }
 
     /** Xem trước các ngày đã đọc được và lần tới của từng ngày, báo dòng ghi sai. */
@@ -604,16 +759,26 @@ public class SettingsActivity extends Activity implements Updater.Listener {
     }
 
     private String placeLabel() {
-        return String.format(java.util.Locale.US, "Đang dùng: %s (%.3f, %.3f)", prefs.placeName(), prefs.placeLat(), prefs.placeLon());
+        return "Đang dùng: " + prefs.placeName();
     }
 
-    private void save(boolean announce) {
-        prefs.setWatchlist(watchlist.getText().toString().trim().length() == 0
-                ? "" : watchlist.getText().toString().trim());
-        String f = feeds.getText().toString().trim();
-        prefs.setFeeds(f);
+    private void save() {
+        prefs.setWatchlist(watchlist.getText().toString());
+        List<String> feedUrls = new ArrayList<String>();
+        for (CheckBox c : feedChecks) if (c.isChecked()) feedUrls.add((String) c.getTag());
+        List<String> rejected = new ArrayList<String>();
+        for (String line : feeds.getText().toString().split("\n")) {
+            String t = line.trim();
+            if (t.length() == 0) continue;
+            if (Prefs.isFeedUrl(t)) feedUrls.add(t);
+            else rejected.add(t);
+        }
+        if (!rejected.isEmpty()) {
+            Toast.makeText(this, "Bỏ qua nguồn RSS không phải địa chỉ https://: " + rejected.get(0), Toast.LENGTH_LONG).show();
+        }
+        prefs.setFeeds(feedUrls);
         String own = personalDays.getText().toString().trim();
-        prefs.putString("personal_days", own);
+        prefs.setPersonalDays(own);
         Lunar.setPersonal(PersonalDays.parse(own, null));
         List<String> pagesOn = new ArrayList<String>();
         for (CheckBox c : pageChecks) if (c.isChecked()) pagesOn.add((String) c.getTag());
@@ -630,7 +795,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         prefs.putInt("day_start", dayStart.get());
         prefs.putInt("day_end", dayEnd.get());
         int nid = nightGroup.getCheckedRadioButtonId();
-        prefs.putString("night_mode", nid == 200 ? Prefs.NIGHT_DIM : nid == 202 ? Prefs.NIGHT_OFF : Prefs.NIGHT_TIMEOUT);
+        prefs.putString("night_mode", nid == 200 ? Prefs.NIGHT_DIM : Prefs.NIGHT_OFF);
         prefs.putInt("idle_minutes", idle.get());
         prefs.putInt("night_brightness", nightBright.get());
         prefs.putInt("day_brightness", dayBright.get());
@@ -640,8 +805,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         prefs.putBool("proximity_sleep", proximitySleep.isChecked());
         prefs.putBool("wake_morning", wakeMorning.isChecked());
         prefs.putBool("auto_start", autoStart.isChecked());
-        prefs.putBool("auto_update", autoUpdate.isChecked());
-        prefs.putInt("update_install_hour", installHour.get());
+        if (autoUpdate != null) prefs.putBool("auto_update", autoUpdate.isChecked());
 
         if (!place.getText().toString().trim().equalsIgnoreCase(prefs.placeName())
                 && place.getText().toString().trim().length() > 0) {
@@ -650,7 +814,67 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         DataHub.get(this).settingsChanged();
         WakeService.sync(this);
         Scheduler.schedule(this);
-        if (announce) Toast.makeText(this, "Đã lưu", Toast.LENGTH_SHORT).show();
+    }
+
+    // ------------------------------------------------------------------ ngày riêng
+
+    /** Hộp thoại thêm ngày giỗ, sinh nhật bằng ô số, không phải gõ cú pháp. */
+    private void askNewPersonalDay() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(8), dp(20), 0);
+        LinearLayout dm = new LinearLayout(this);
+        dm.setOrientation(LinearLayout.HORIZONTAL);
+        final EditText day = numberField("Ngày");
+        final EditText month = numberField("Tháng");
+        dm.addView(day, new LinearLayout.LayoutParams(0, -2, 1f));
+        LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(0, -2, 1f);
+        mp.leftMargin = dp(12);
+        dm.addView(month, mp);
+        box.addView(dm);
+        final RadioGroup kind = radios(box, 400, new String[]{"Âm lịch", "Dương lịch"});
+        kind.setOrientation(RadioGroup.HORIZONTAL);
+        ((RadioButton) kind.getChildAt(0)).setChecked(true);
+        final EditText name = new EditText(this);
+        name.setHint("Tên, vd Giỗ ông nội");
+        name.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        name.setSingleLine(true);
+        name.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+        box.addView(name);
+        final AlertDialog d = new AlertDialog.Builder(this)
+                .setTitle("Thêm ngày giỗ, sinh nhật")
+                .setView(box)
+                .setPositiveButton("Thêm", null)
+                .setNegativeButton("Huỷ", null)
+                .create();
+        d.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+        d.show();
+        // Gắn lại sau show() để hộp thoại không tự đóng khi nhập sai.
+        d.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                int kid = kind.getCheckedRadioButtonId();
+                String line = day.getText().toString().trim() + "/" + month.getText().toString().trim()
+                        + (kid == 400 ? " âm " : " ") + name.getText().toString().trim();
+                List<Integer> bad = new ArrayList<Integer>();
+                if (PersonalDays.parse(line, bad).isEmpty() || !bad.isEmpty()) {
+                    Toast.makeText(SettingsActivity.this, "Ngày, tháng hoặc tên chưa đúng", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                String cur = personalDays.getText().toString().trim();
+                personalDays.setText(cur.length() == 0 ? line : cur + "\n" + line);
+                d.dismiss();
+            }
+        });
+    }
+
+    private EditText numberField(String hint) {
+        EditText e = new EditText(this);
+        e.setHint(hint);
+        e.setInputType(InputType.TYPE_CLASS_NUMBER);
+        e.setSingleLine(true);
+        e.setImeOptions(EditorInfo.IME_ACTION_NEXT | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+        return e;
     }
 
     // ------------------------------------------------------------------ vị trí hiện tại
@@ -658,8 +882,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
     private void useCurrentLocation() {
         if (Build.VERSION.SDK_INT >= 23
                 && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,
-                    Manifest.permission.ACCESS_FINE_LOCATION}, REQ_LOCATION);
+            requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, REQ_LOCATION);
             return;
         }
         locate();
@@ -674,10 +897,11 @@ public class SettingsActivity extends Activity implements Updater.Listener {
                 return;
             }
         }
-        placeState.setText("Chưa được phép dùng vị trí. Có thể nhập tên thành phố rồi bấm Tìm.");
+        placeState.setText("Chưa được phép dùng vị trí. Có thể nhập tên thành phố rồi bấm Tìm, "
+                + "hoặc cấp quyền Vị trí trong Cài đặt của máy > Ứng dụng > Nhật Nguyệt.");
     }
 
-    /** Lấy vị trí gần nhất máy đã biết; nếu cũ quá thì xin một lần mới (tối đa 30 giây). */
+    /** Lấy vị trí gần nhất máy đã biết; nếu cũ quá thì xin một lần mới qua mạng (tối đa 30 giây). */
     @SuppressLint("MissingPermission") // đã kiểm tra quyền ở useCurrentLocation()
     private void locate() {
         if (locationListener != null) return;
@@ -701,11 +925,10 @@ public class SettingsActivity extends Activity implements Updater.Listener {
                 usePlace(best);
                 return;
             }
-            String provider = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) ? LocationManager.NETWORK_PROVIDER
-                    : lm.isProviderEnabled(LocationManager.GPS_PROVIDER) ? LocationManager.GPS_PROVIDER : null;
-            if (provider == null) {
+            // Thời tiết chỉ cần cấp thành phố: vị trí qua mạng (Wi‑Fi, trạm phát) là đủ, không cần GPS.
+            if (!lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
                 if (best != null) usePlace(best);
-                else placeState.setText("Định vị đang tắt. Hãy bật vị trí (GPS hoặc Wi‑Fi) trong cài đặt của máy rồi thử lại.");
+                else placeState.setText("Định vị đang tắt. Hãy bật vị trí trong cài đặt của máy rồi thử lại, hoặc nhập tên thành phố.");
                 return;
             }
             final Location fallback = best;
@@ -734,10 +957,10 @@ public class SettingsActivity extends Activity implements Updater.Listener {
                 public void run() {
                     stopLocating();
                     if (fallback != null) usePlace(fallback);
-                    else placeState.setText("Không lấy được vị trí. Hãy thử lại ở gần cửa sổ, hoặc nhập tên thành phố.");
+                    else placeState.setText("Không lấy được vị trí. Hãy nhập tên thành phố rồi bấm Tìm.");
                 }
             };
-            lm.requestSingleUpdate(provider, locationListener, Looper.getMainLooper());
+            lm.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, locationListener, Looper.getMainLooper());
             handler.postDelayed(locateTimeout, 30_000L);
             placeState.setText("Đang lấy vị trí…");
         } catch (SecurityException e) {
@@ -770,7 +993,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
                     name = "Vị trí hiện tại";
                 }
                 new Prefs(app).setPlace(name, lat, lon);
-                DataHub.get(app).settingsChanged();
+                DataHub.get(app).settingsChanged(); // tự chuyển về luồng chính
                 handler.post(new Runnable() {
                     @Override
                     public void run() {
@@ -790,7 +1013,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         if (name.length() == 0 || geocoding) return;
         geocoding = true;
         placeState.setText("Đang tìm \"" + name + "\"…");
-        final android.content.Context app = getApplicationContext();
+        final Context app = getApplicationContext();
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -798,11 +1021,11 @@ public class SettingsActivity extends Activity implements Updater.Listener {
                 try {
                     Object[] r = WeatherSource.geocode(name);
                     new Prefs(app).setPlace((String) r[0], (Double) r[1], (Double) r[2]);
-                    DataHub.get(app).settingsChanged();
+                    DataHub.get(app).settingsChanged(); // tự chuyển về luồng chính
                     msg = null;
                 } catch (Exception e) {
                     msg = e.getMessage() != null && e.getMessage().startsWith("Không tìm thấy")
-                            ? e.getMessage() : "Lỗi: " + Http.describe(e);
+                            ? e.getMessage() : "Chưa tìm được: " + Http.describe(e);
                 }
                 final String m = msg;
                 handler.post(new Runnable() {
@@ -838,6 +1061,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         EditText e = new EditText(this);
         e.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         e.setHint(hint);
+        e.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         return e;
     }
 
@@ -849,56 +1073,93 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         box.setPadding(dp(20), dp(8), dp(20), 0);
         box.addView(first);
         box.addView(again);
-        AlertDialog d = new AlertDialog.Builder(this)
+        final AlertDialog d = new AlertDialog.Builder(this)
                 .setTitle("Đặt mã PIN cho Cài đặt")
                 .setView(box)
-                .setPositiveButton("Lưu", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        String pin = first.getText().toString();
-                        String msg;
-                        if (!pin.matches("\\d{4,8}")) {
-                            msg = "Mã PIN cần 4–8 chữ số";
-                        } else if (!pin.equals(again.getText().toString())) {
-                            msg = "Hai lần nhập không khớp";
-                        } else {
-                            prefs.setSettingsPin(pin);
-                            refreshPin();
-                            msg = "Đã khoá Cài đặt bằng mã PIN";
-                        }
-                        Toast.makeText(SettingsActivity.this, msg, Toast.LENGTH_SHORT).show();
-                    }
-                })
+                .setPositiveButton("Lưu", null)
                 .setNegativeButton("Huỷ", null)
                 .create();
         d.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
         d.show();
+        // Gắn lại sau show() để hộp thoại không tự đóng khi nhập sai.
+        d.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String pin = first.getText().toString();
+                if (!pin.matches("\\d{4,8}")) {
+                    Toast.makeText(SettingsActivity.this, "Mã PIN cần 4–8 chữ số", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!pin.equals(again.getText().toString())) {
+                    Toast.makeText(SettingsActivity.this, "Hai lần nhập không khớp", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                prefs.setSettingsPin(pin);
+                prefs.setPinFails(0, 0);
+                refreshPin();
+                Toast.makeText(SettingsActivity.this, "Đã khoá Cài đặt bằng mã PIN", Toast.LENGTH_SHORT).show();
+                d.dismiss();
+            }
+        });
     }
 
     private void refreshStates() {
         refreshPin();
         boolean admin = AdminReceiver.isActive(this);
-        adminButton.setText(admin ? "Gỡ quyền tắt màn hình (quản trị thiết bị)" : "Cấp quyền tắt màn hình (quản trị thiết bị)");
-        adminState.setText(admin ? "Đã cấp quyền: có thể tắt hẳn màn hình ban đêm. Nhớ gỡ quyền trước khi gỡ app."
-                : "Chưa cấp quyền: chế độ \"Tắt hẳn\" sẽ dùng thời gian chờ của máy.");
-        versionText.setText("Phiên bản " + BuildConfig.VERSION_NAME + " · Android " + Build.VERSION.RELEASE + " · TLS " + Tls.engine());
-        String st = updater.message();
-        if (updater.ready()) {
-            installButton.setVisibility(View.VISIBLE);
-            installButton.setText("Cài bản " + updater.readyName());
-            String notes = updater.readyNotes();
-            if (st.length() == 0) st = "Bản " + updater.readyName() + " đã tải xong.";
-            if (notes.length() > 0) st += "\n" + notes;
-        } else {
-            installButton.setVisibility(View.GONE);
+        for (StatusRow r : statusRows) {
+            String t = r.view.getText().toString().substring(3);
+            if (t.startsWith("Hiện trên")) r.set(Build.VERSION.SDK_INT >= 23 && canDrawOverlays(), t);
+            else if (t.startsWith("Chạy nền")) r.set(Build.VERSION.SDK_INT >= 23 && ignoringBattery(), t);
+            else if (t.startsWith("Thông báo")) r.set(Build.VERSION.SDK_INT >= 33 && hasNotifications(), t);
+            else if (t.startsWith("Tắt màn hình")) r.set(admin, t);
         }
-        if (!updater.supported()) st = "Bản debug (vn.nhatnguyet.debug) không tự cập nhật.";
-        updateState.setText(st);
+        versionText.setText("Phiên bản " + BuildConfig.VERSION_NAME);
+        versionDetail.setText("Phiên bản " + BuildConfig.VERSION_NAME + " · Android " + Build.VERSION.RELEASE
+                + " (API " + Build.VERSION.SDK_INT + ") · TLS " + Tls.engine() + " · " + Build.MODEL);
+        if (updateState != null) {
+            String st = updater.message();
+            if (updater.ready()) {
+                installButton.setVisibility(View.VISIBLE);
+                installButton.setText("Cài bản " + updater.readyName());
+                String notes = updater.readyNotes();
+                if (st.length() == 0) st = "Bản " + updater.readyName() + " đã tải xong.";
+                if (notes.length() > 0) st += "\n" + notes;
+            } else {
+                installButton.setVisibility(View.GONE);
+            }
+            if (!updater.supported()) st = "Bản này không tự cập nhật.";
+            updateState.setText(st);
+        }
+    }
+
+    @TargetApi(23)
+    private boolean canDrawOverlays() {
+        return Settings.canDrawOverlays(this);
+    }
+
+    @TargetApi(23)
+    private boolean ignoringBattery() {
+        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        return pm != null && pm.isIgnoringBatteryOptimizations(getPackageName());
+    }
+
+    @TargetApi(23)
+    private boolean hasNotifications() {
+        return checkSelfPermission("android.permission.POST_NOTIFICATIONS") == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void askAdmin() {
+        try {
+            startActivityForResult(AdminReceiver.requestIntent(this), REQ_ADMIN);
+        } catch (Throwable t) {
+            Toast.makeText(this, "Máy không hỗ trợ quyền quản trị; màn sẽ tắt theo thời gian chờ của máy", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void toggleAdmin() {
         if (AdminReceiver.isActive(this)) {
             AdminReceiver.remove(this);
+            Toast.makeText(this, "Đã gỡ quyền quản trị thiết bị", Toast.LENGTH_SHORT).show();
             handler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
@@ -906,11 +1167,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
                 }
             }, 500);
         } else {
-            try {
-                startActivityForResult(AdminReceiver.requestIntent(this), REQ_ADMIN);
-            } catch (Throwable t) {
-                Toast.makeText(this, "Máy không hỗ trợ quyền quản trị", Toast.LENGTH_LONG).show();
-            }
+            askAdmin();
         }
     }
 
@@ -922,15 +1179,14 @@ public class SettingsActivity extends Activity implements Updater.Listener {
 
     private String sensorInfo() {
         Sensor s = WakeService.proximitySensor(this);
-        if (s == null) return "Máy không có cảm biến tiệm cận – chạm màn hình hoặc bấm nút nguồn để bật.";
-        return "Cảm biến nằm cạnh loa thoại: " + s.getName() + " (tối đa " + Math.round(s.getMaximumRange()) + " cm). "
-                + "Một số máy đời mới chỉ bật cảm biến khi đang gọi nên có thể không đánh thức được khi màn đã tắt.";
+        if (s == null) return "Máy này không có cảm biến tiệm cận: chạm màn hình hoặc bấm nút nguồn để bật.";
+        return "Cảm biến tiệm cận nằm cạnh loa nghe. Một số máy đời mới chỉ bật cảm biến khi đang gọi, "
+                + "khi đó vẫy tay không đánh thức được màn đã tắt.";
     }
 
     @TargetApi(23)
     private void askIgnoreBattery() {
-        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-        if (pm != null && pm.isIgnoringBatteryOptimizations(getPackageName())) {
+        if (ignoringBattery()) {
             Toast.makeText(this, "App đã được phép chạy nền.", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -947,7 +1203,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
 
     @TargetApi(23)
     private void askOverlay() {
-        if (Settings.canDrawOverlays(this)) {
+        if (canDrawOverlays()) {
             Toast.makeText(this, "Đã được phép.", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -960,5 +1216,27 @@ public class SettingsActivity extends Activity implements Updater.Listener {
     @TargetApi(33)
     private void askNotifications() {
         requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 9);
+    }
+
+    /** Giấy phép bên thứ ba: đọc tệp NOTICE đóng gói trong APK. */
+    private void showNotice() {
+        String text;
+        try {
+            InputStream in = getAssets().open("NOTICE.txt");
+            try {
+                text = new String(Http.readAll(in, 256 * 1024), Http.UTF8);
+            } finally {
+                Http.closeQuietly(in);
+            }
+        } catch (Exception e) {
+            text = "Không đọc được tệp NOTICE.";
+        }
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        t.setPadding(dp(16), dp(8), dp(16), dp(8));
+        ScrollView sv = new ScrollView(this);
+        sv.addView(t);
+        new AlertDialog.Builder(this).setTitle("Giấy phép bên thứ ba").setView(sv).setPositiveButton("Đóng", null).show();
     }
 }

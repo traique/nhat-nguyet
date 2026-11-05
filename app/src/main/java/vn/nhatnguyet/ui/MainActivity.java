@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import vn.nhatnguyet.BuildConfig;
 import vn.nhatnguyet.Fmt;
 import vn.nhatnguyet.Prefs;
 import vn.nhatnguyet.Theme;
@@ -67,8 +68,14 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
     private static final long POLICY_MS = 15_000L;
     private static final long SHIFT_MS = 120_000L;
     private static final String[] DATA_KEYS = {"weather", "gold", "fuel", "fx", "stocks", "news"};
-    /** 01/01/2026: giờ máy trước mốc này chắc chắn sai (máy cũ hết pin hay về năm 2012). */
-    private static final long MIN_SANE_TIME = 1767225600000L;
+    /** Giờ máy trước ngày build (trừ 1 ngày) chắc chắn sai (máy cũ hết pin hay về năm 2012). */
+    private static final long MIN_SANE_TIME = BuildConfig.BUILD_TIME - 86_400_000L;
+    private static final long BACK_TWICE_MS = 2_000L;
+    private static final int PIN_MAX_FAILS = 5;
+    private static final long PIN_LOCK_MS = 30_000L;
+
+    /** Cài đặt bấm "Thoát bảng lịch": đóng app khi quay lại (phím Back bị chặn để không thoát nhầm). */
+    public static volatile boolean exitRequested;
 
     private Prefs prefs;
     private DataHub hub;
@@ -126,6 +133,12 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
     private long lastTouch;
     private boolean resumed;
     private boolean lockedThisIdle;
+    /** Trạng thái FLAG_KEEP_SCREEN_ON đã đặt, để không gọi addFlags/clearFlags thừa mỗi 15 giây. */
+    private Boolean keepOnApplied;
+    private long lastBack;
+    /** Android 10+ chưa cấp "hiện trên ứng dụng khác" trong khi có tuỳ chọn tự bật lại đang bật. */
+    private boolean overlayMissing;
+    private boolean setupDialogShown;
     private int shiftStep;
     private String dayKey = "";
     private final Map<String, String> rendered = new HashMap<String, String>();
@@ -141,14 +154,16 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         updater = Updater.get(this);
 
         Window w = getWindow();
-        w.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
-                | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-                | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
-                | WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        if (Build.VERSION.SDK_INT >= 27) {
-            setShowWhenLocked(true);
-            setTurnScreenOn(true);
+        w.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        if (Build.VERSION.SDK_INT < 27) {
+            // Từ API 27 dùng showWhenLocked/turnScreenOn trong manifest.
+            w.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                    | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                    | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
         }
+        // Activity mới thì chưa phủ đen; cờ tĩnh của WakeService phải theo.
+        blackout = false;
+        WakeService.blackout = false;
         root = new BoardRoot(this);
         root.setBackgroundColor(Theme.BG);
         root.onSize = new Runnable() {
@@ -164,16 +179,91 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         Scheduler.schedule(this);
         handleIntent(getIntent());
 
-        if (!prefs.raw().getBoolean("hint_shown", false)) {
-            prefs.putBool("hint_shown", true);
-            Toast.makeText(this, "Vuốt lên/xuống trên đồng hồ để chỉnh độ sáng. Bánh răng ở góc trên bên phải mở Cài đặt.",
-                    Toast.LENGTH_LONG).show();
-        }
+    }
+
+    /** Lần đầu mở app: hỏi nơi ở (thời tiết đúng chỗ ngay từ đầu) và chỉ cách mở Cài đặt. */
+    private void maybeShowSetup() {
+        if (prefs.setupDone() || setupDialogShown) return;
+        setupDialogShown = true;
+        final EditText city = new EditText(this);
+        city.setHint("Thành phố, vd Hà Nội, Cần Thơ");
+        city.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        city.setSingleLine(true);
+        city.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI | EditorInfo.IME_FLAG_NO_FULLSCREEN);
+        FrameLayout box = new FrameLayout(this);
+        int pad = Math.round(20 * getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad / 2, pad, 0);
+        box.addView(city);
+        AlertDialog d = new AlertDialog.Builder(this, AlertDialog.THEME_DEVICE_DEFAULT_DARK)
+                .setTitle("Nhà mình ở đâu?")
+                .setMessage("Để hiện thời tiết đúng nơi. Sau này đổi trong Cài đặt (bánh răng góc trên bên phải, "
+                        + "hoặc giữ lâu vào đồng hồ). Vuốt dọc trên đồng hồ để chỉnh độ sáng.")
+                .setView(box)
+                .setPositiveButton("Xong", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        prefs.setSetupDone();
+                        String name = city.getText().toString().trim();
+                        if (name.length() > 0) geocodeFirstPlace(name);
+                    }
+                })
+                .setNeutralButton("Dùng vị trí hiện tại", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        prefs.setSetupDone();
+                        startActivity(new Intent(MainActivity.this, SettingsActivity.class).putExtra(SettingsActivity.EXTRA_LOCATE, true));
+                    }
+                })
+                .setNegativeButton("Để sau", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        prefs.setSetupDone();
+                    }
+                })
+                .create();
+        d.setOnDismissListener(new DialogInterface.OnDismissListener() {
+            @Override
+            public void onDismiss(DialogInterface dialog) {
+                touch();
+            }
+        });
+        d.show();
+    }
+
+    private void geocodeFirstPlace(final String name) {
+        final Context app = getApplicationContext();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                String msg;
+                try {
+                    Object[] r = WeatherSource.geocode(name);
+                    new Prefs(app).setPlace((String) r[0], (Double) r[1], (Double) r[2]);
+                    DataHub.get(app).settingsChanged();
+                    msg = "Thời tiết theo " + r[0];
+                } catch (Exception e) {
+                    msg = "Chưa tìm được \"" + name + "\". Vào Cài đặt để chọn lại nơi ở.";
+                }
+                final String m = msg;
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(app, m, Toast.LENGTH_LONG).show();
+                        if (resumed) renderStatus();
+                    }
+                });
+            }
+        }, "nn-geocode").start();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        if (exitRequested) {
+            exitRequested = false;
+            finish();
+            return;
+        }
         resumed = true;
         hub.addListener(this);
         updater.addListener(this);
@@ -195,6 +285,15 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             readBattery(registerReceiver(batteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED)));
         } catch (Throwable ignored) {
         }
+        try {
+            IntentFilter tf = new IntentFilter(Intent.ACTION_TIME_CHANGED);
+            tf.addAction(Intent.ACTION_DATE_CHANGED);
+            tf.addAction(Intent.ACTION_TIMEZONE_CHANGED);
+            registerReceiver(timeReceiver, tf);
+        } catch (Throwable ignored) {
+        }
+        keepOnApplied = null;
+        checkOverlay();
         touch();
         lastTouch = 0;
         if (root.getWidth() > 0) rebuild();
@@ -203,6 +302,43 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         handler.postDelayed(policyTick, POLICY_MS);
         handler.postDelayed(rotateTick, prefs.rotateSeconds() * 1000L);
         handler.postDelayed(shiftTick, SHIFT_MS);
+        maybeShowSetup();
+    }
+
+    /** Android 10+ chặn mở Activity từ nền nếu thiếu quyền "hiện trên ứng dụng khác". */
+    @SuppressLint("NewApi")
+    private void checkOverlay() {
+        boolean need = prefs.autoStart() || prefs.wakeMorning() || prefs.proximityWake();
+        overlayMissing = Build.VERSION.SDK_INT >= 29 && need && !Settings.canDrawOverlays(this);
+    }
+
+    /** Người dùng chỉnh giờ máy: bỏ các mẫu đo cũ, kiểm lại ngay. */
+    private final BroadcastReceiver timeReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            ClockCheck.reset();
+            clockWrong = false;
+            if (resumed) {
+                renderClock();
+                hub.refreshAll();
+            }
+        }
+    };
+
+    @Override
+    public void onBackPressed() {
+        // Máy treo tường: một lần bấm nhầm Back không được làm bảng lịch biến mất.
+        if (prefs.hasSettingsPin()) {
+            Toast.makeText(this, "Cài đặt đang khoá. Thoát bảng lịch trong Cài đặt > Nâng cao.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastBack < BACK_TWICE_MS) {
+            super.onBackPressed();
+            return;
+        }
+        lastBack = now;
+        Toast.makeText(this, "Bấm Back lần nữa để thoát bảng lịch", Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -213,6 +349,10 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         hub.stop();
         try {
             unregisterReceiver(batteryReceiver);
+        } catch (Throwable ignored) {
+        }
+        try {
+            unregisterReceiver(timeReceiver);
         } catch (Throwable ignored) {
         }
         WakeService.onWave = null;
@@ -280,6 +420,11 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             startActivity(new Intent(this, SettingsActivity.class));
             return;
         }
+        long wait = prefs.pinLockUntil() - System.currentTimeMillis();
+        if (wait > 0) {
+            Toast.makeText(this, "Sai mã PIN nhiều lần, thử lại sau " + (wait / 1000 + 1) + " giây", Toast.LENGTH_SHORT).show();
+            return;
+        }
         final EditText pin = new EditText(this);
         pin.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         pin.setImeOptions(EditorInfo.IME_ACTION_DONE);
@@ -308,12 +453,31 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             }
         });
         dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+        // Đang nhập PIN cũng là đang dùng máy: không để ban đêm tắt màn giữa chừng.
+        dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+            @Override
+            public void onDismiss(DialogInterface d) {
+                touch();
+            }
+        });
+        touch();
         dialog.show();
     }
 
     private void unlockSettings(String pin) {
-        if (prefs.checkSettingsPin(pin)) startActivity(new Intent(this, SettingsActivity.class));
-        else Toast.makeText(this, "Sai mã PIN", Toast.LENGTH_SHORT).show();
+        if (prefs.checkSettingsPin(pin)) {
+            prefs.setPinFails(0, 0);
+            startActivity(new Intent(this, SettingsActivity.class));
+            return;
+        }
+        int fails = prefs.pinFails() + 1;
+        if (fails >= PIN_MAX_FAILS) {
+            prefs.setPinFails(0, System.currentTimeMillis() + PIN_LOCK_MS);
+            Toast.makeText(this, "Sai mã PIN " + fails + " lần, chờ " + (PIN_LOCK_MS / 1000) + " giây", Toast.LENGTH_SHORT).show();
+        } else {
+            prefs.setPinFails(fails, 0);
+            Toast.makeText(this, "Sai mã PIN", Toast.LENGTH_SHORT).show();
+        }
     }
 
     // ------------------------------------------------------------------ hẹn giờ
@@ -401,44 +565,38 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
     }
 
     private void setBlackout(boolean on) {
+        if (blackout == on && shade != null && (shade.getVisibility() == View.VISIBLE) == on) return;
         blackout = on;
         WakeService.blackout = on;
         if (shade != null) shade.setVisibility(on ? View.VISIBLE : View.GONE);
+        // Phủ đen chờ máy tự tắt: không xoay trang, không dịch chống lưu ảnh cho đỡ tốn CPU.
+        handler.removeCallbacks(rotateTick);
+        handler.removeCallbacks(shiftTick);
+        if (!on && resumed) {
+            handler.postDelayed(rotateTick, Math.max(5, prefs.rotateSeconds()) * 1000L);
+            handler.postDelayed(shiftTick, SHIFT_MS);
+        }
     }
 
     private void applyScreenPolicy() {
-        Calendar now = Calendar.getInstance();
-        boolean night = prefs.isNight(now);
-        long idle = SystemClock.elapsedRealtime() - lastInteraction;
-        boolean keepOn;
-        float bright;
-        if (!night) {
-            keepOn = true;
-            int db = prefs.dayBrightness();
-            bright = db <= 0 ? WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE : Math.min(1f, db / 100f);
-            lockedThisIdle = false;
-        } else {
-            bright = Math.max(0.01f, Math.min(1f, prefs.nightBrightness() / 100f));
-            String mode = prefs.nightMode();
-            boolean active = idle < prefs.idleMinutes() * 60_000L;
-            if (Prefs.NIGHT_DIM.equals(mode) || active) {
-                keepOn = true;
-            } else {
-                keepOn = false;
-                if (Prefs.NIGHT_OFF.equals(mode) && !lockedThisIdle && resumed) {
-                    lockedThisIdle = true;
-                    AdminReceiver.lockNow(this);
-                }
-            }
+        boolean night = prefs.isNight(Calendar.getInstance());
+        if (!night) lockedThisIdle = false;
+        NightPolicy p = NightPolicy.decide(night, prefs.nightMode(), SystemClock.elapsedRealtime() - lastInteraction,
+                prefs.idleMinutes() * 60_000L, prefs.dayBrightness(), prefs.nightBrightness(), liveBrightness,
+                blackout, lockedThisIdle);
+        if (p.lockNow && resumed) {
+            lockedThisIdle = true;
+            AdminReceiver.lockNow(this);
         }
-        if (liveBrightness > 0) bright = liveBrightness / 100f;
-        if (blackout) {
-            keepOn = false;
-            bright = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_OFF;
-        }
+        boolean keepOn = p.keepOn;
+        float bright = p.brightness;
         Window w = getWindow();
-        if (keepOn) w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        else w.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (keepOnApplied == null || keepOnApplied != keepOn) {
+            // Mỗi lần addFlags/clearFlags là một lượt bố cục lại cửa sổ: chỉ gọi khi cờ đổi.
+            if (keepOn) w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            else w.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            keepOnApplied = keepOn;
+        }
         WindowManager.LayoutParams lp = w.getAttributes();
         if (lp.screenBrightness != bright) {
             lp.screenBrightness = bright;
@@ -504,8 +662,12 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         return prefs.warmNight() && !prefs.isDaytime(Calendar.getInstance());
     }
 
+    @SuppressLint("NewApi")
     private void maybeAutoInstall() {
         if (!updater.ready()) return;
+        // Chưa được phép cài: không tự nhảy sang màn Cài đặt của máy (máy treo tường sẽ kẹt ở đó);
+        // dòng trạng thái vẫn ghi "chạm để cài", người dùng chạm mới mở màn cấp quyền.
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) return;
         int hour = prefs.updateInstallHour();
         Calendar c = Calendar.getInstance();
         if (hour < 0 || c.get(Calendar.HOUR_OF_DAY) != hour) return;
@@ -848,7 +1010,7 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             flipIcon.setVisibility(View.GONE);
             flipTemp.setText("");
             DataHub.Entry e = hub.entry("weather");
-            flipDesc.setText(e != null && e.error != null ? "Thời tiết: " + e.error : "Đang tải thời tiết…");
+            flipDesc.setText(e != null && e.error != null ? "Chưa lấy được thời tiết" : "Đang tải thời tiết…");
             return;
         }
         int code = now.optInt("code");
@@ -1097,7 +1259,7 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             nowIcon.setVisibility(View.INVISIBLE);
             tempText.setText("--°");
             DataHub.Entry e = hub.entry("weather");
-            if (e != null && e.error != null) descText.set(Theme.WARN, "Lỗi: " + e.error, "Lỗi tải");
+            if (e != null && e.error != null) descText.set(Theme.WARN, "Chưa lấy được thời tiết", "Chưa có");
             else descText.set(Theme.DIM, "Đang tải thời tiết…", "Đang tải…");
             detailText.set(Theme.DIM, prefs.placeName());
             alertLine.setVisibility(View.GONE);
@@ -1145,7 +1307,8 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
 
         JSONArray hours = w.optJSONArray("hours");
         if (hours != null) {
-            for (int i = 1; i <= hoursCount && i < hours.length(); i++) {
+            int start = WeatherSource.firstUpcomingHour(w, System.currentTimeMillis());
+            for (int i = start; i < start + hoursCount && i < hours.length(); i++) {
                 JSONObject h = hours.optJSONObject(i);
                 LinearLayout c = ui.row();
                 c.setGravity(Gravity.CENTER_VERTICAL);
@@ -1197,6 +1360,11 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             statusText.set(Theme.WARN, "Lỗi tải " + err + " · chạm để thử lại", "Lỗi tải " + err, "Lỗi tải dữ liệu");
             return;
         }
+        if (overlayMissing) {
+            statusText.set(Theme.WARN, "Để tự bật lại, cho phép hiện trên ứng dụng khác · chạm để cấp",
+                    "Chưa cho phép hiện trên ứng dụng khác · chạm để cấp", "Thiếu quyền tự bật lại · chạm");
+            return;
+        }
         DataHub.Entry e = hub.entry("weather");
         String place = prefs.placeName();
         if (e == null || e.at <= 0) {
@@ -1208,6 +1376,7 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         statusText.set(Theme.META, place + " · " + fresh, fresh);
     }
 
+    @SuppressLint("NewApi")
     private void onStatusClick() {
         if (updater.ready()) {
             updater.install(this);
@@ -1217,10 +1386,27 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             } catch (Throwable t) {
                 Toast.makeText(this, "Mở Cài đặt của máy > Ngày và giờ, bật Tự động", Toast.LENGTH_LONG).show();
             }
+        } else if (overlayMissing && errorCount() == 0) {
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        android.net.Uri.parse("package:" + getPackageName())));
+            } catch (Throwable t) {
+                startActivity(new Intent(this, SettingsActivity.class));
+            }
         } else {
             hub.refreshAll();
             Toast.makeText(this, "Đang tải lại dữ liệu…", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private int errorCount() {
+        int n = 0;
+        for (String k : DATA_KEYS) {
+            Source s = hub.source(k);
+            DataHub.Entry e = hub.entry(k);
+            if (s != null && e != null && s.enabled(prefs) && e.error != null) n++;
+        }
+        return n;
     }
 
     private void renderMiddle() {

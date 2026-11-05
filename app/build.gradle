@@ -2,9 +2,11 @@ plugins {
     id 'com.android.application'
 }
 
-// Phiên bản lấy từ biến môi trường VERSION_NAME (CI đặt theo tag vX.Y.Z).
-// versionCode = X*10000 + Y*100 + Z, luôn tăng khi tăng tag.
-def verName = (System.getenv('VERSION_NAME') ?: (project.findProperty('versionName') ?: '0.1.0')).toString()
+// Phiên bản ghi cố định ở đây (F-Droid và người build từ mã nguồn đọc được). CI kiểm tra tag vX.Y.Z phải
+// khớp; bản thử trên nhánh có thể ghi đè bằng biến môi trường VERSION_NAME (vd. 0.0.123).
+// versionCode = X*10000 + Y*100 + Z, luôn tăng khi tăng phiên bản.
+def APP_VERSION = '1.0.2'
+def verName = (System.getenv('VERSION_NAME') ?: (project.findProperty('versionName') ?: APP_VERSION)).toString()
 def verParts = verName.tokenize('.-')
 def verCode = 0
 try {
@@ -17,6 +19,13 @@ if (verCode < 1) verCode = 1
 def updateRepo = (System.getenv('UPDATE_REPO') ?: 'traique/nhat-nguyet').toString()
 // Có thể trỏ sang máy chủ khác để thử OTA (vd. http://10.0.2.2:8000/update.json trên máy ảo).
 def updateUrl = (System.getenv('UPDATE_URL') ?: "https://github.com/${updateRepo}/releases/latest/download/update.json").toString()
+// Mốc thời gian build (giây, từ commit để build tái lập được): giờ máy trước mốc này chắc chắn sai.
+def buildTime = 0L
+try {
+    buildTime = ('git log -1 --format=%ct'.execute(null, rootDir).text.trim() as long) * 1000L
+} catch (Exception ignored) {
+}
+if (buildTime <= 0) buildTime = 1767225600000L // 01/01/2026
 
 android {
     namespace 'vn.nhatnguyet'
@@ -29,6 +38,7 @@ android {
         versionCode verCode
         versionName verName
         buildConfigField 'String', 'UPDATE_URL', "\"${updateUrl}\""
+        buildConfigField 'long', 'BUILD_TIME', "${buildTime}L"
         ndk {
             // Conscrypt chỉ dùng trên Android < 5.0, nhưng phải có cả bản 64-bit
             // để máy mới chỉ chạy 64-bit vẫn cài được.
@@ -47,6 +57,25 @@ android {
             }
             enableV1Signing true
             enableV2Signing true
+        }
+    }
+
+    // github: bản phát hành trên GitHub Releases, tự cập nhật OTA, chạy từ Android 4.0.3 (có Conscrypt).
+    // store: bản cho Google Play / F-Droid: không OTA, không quyền cài gói, Android 7 trở lên, không thư viện native.
+    flavorDimensions 'dist'
+    productFlavors {
+        github {
+            dimension 'dist'
+            buildConfigField 'boolean', 'OTA', 'true'
+        }
+        store {
+            dimension 'dist'
+            minSdk 24
+            versionNameSuffix '-store'
+            buildConfigField 'boolean', 'OTA', 'false'
+            ndk {
+                abiFilters.clear()
+            }
         }
     }
 
@@ -87,11 +116,11 @@ android {
                 'Overdraw', 'UnusedResources', 'MonochromeLauncherIcon', 'DiscouragedApi',
                 'SpUsage', 'ClickableViewAccessibility', 'BatteryLife', 'Wakelock',
                 'WakelockTimeout', 'ProtectedPermissions', 'QueryAllPackagesPermission',
-                'RequestInstallPackagesPolicy', 'ExportedReceiver', 'UnspecifiedRegisterReceiverFlag',
-                'CustomX509TrustManager', 'TrustAllX509TrustManager', 'ScheduleExactAlarm',
-                'ExactAlarm', 'ObsoleteSdkInt', 'SystemPermissionTypo', 'UseCompatLoadingForDrawables',
+                'ExportedReceiver', 'UnspecifiedRegisterReceiverFlag',
+                'CustomX509TrustManager', 'TrustAllX509TrustManager',
+                'ObsoleteSdkInt', 'SystemPermissionTypo',
                 'DrawAllocation', 'ViewConstructor', 'LockedOrientationActivity', 'SourceLockedOrientationActivity',
-                'MissingApplicationIcon', 'AppLinkUrlError', 'DefaultLocale'
+                'MissingApplicationIcon', 'AppLinkUrlError', 'DefaultLocale', 'StaticFieldLeak'
     }
 
     testOptions {
@@ -100,8 +129,11 @@ android {
 }
 
 dependencies {
-    // Bản cuối cùng của Conscrypt còn hỗ trợ Android cũ (minSdk 9). Từ 2.6.0 đòi API 21.
-    implementation 'org.conscrypt:conscrypt-android:2.5.2'
+    // Conscrypt 2.5.x là dòng cuối còn hỗ trợ Android cũ (minSdk 9); 2.5.3 căn thư viện native 16 KB.
+    // Từ 2.6.0 đòi API 21. Chỉ nạp khi chạy trên Android < 5 (net/Tls.java).
+    // Bản store (Android 7+) chỉ cần để biên dịch, không đóng gói thư viện native.
+    githubImplementation 'org.conscrypt:conscrypt-android:2.5.3'
+    storeCompileOnly 'org.conscrypt:conscrypt-android:2.5.3'
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20231013'
     testImplementation 'net.sf.kxml:kxml2:2.3.0'

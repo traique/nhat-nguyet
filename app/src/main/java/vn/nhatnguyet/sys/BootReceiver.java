@@ -3,6 +3,7 @@ package vn.nhatnguyet.sys;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.os.SystemClock;
 
 import vn.nhatnguyet.Prefs;
 import vn.nhatnguyet.ui.MainActivity;
@@ -13,7 +14,9 @@ public class BootReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         String a = intent.getAction();
         if (a == null) return;
-        boolean boot = a.equals(Intent.ACTION_BOOT_COMPLETED) || a.endsWith("QUICKBOOT_POWERON");
+        // QUICKBOOT_POWERON (HTC, Asus) không được hệ thống bảo vệ: chỉ nhận trong 10 phút đầu sau khi bật máy.
+        boolean boot = a.equals(Intent.ACTION_BOOT_COMPLETED)
+                || (a.endsWith("QUICKBOOT_POWERON") && SystemClock.elapsedRealtime() < 10 * 60_000L);
         boolean replaced = a.equals(Intent.ACTION_MY_PACKAGE_REPLACED);
         if (!boot && !replaced) return;
         WakeService.sync(context);

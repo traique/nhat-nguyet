@@ -21,6 +21,11 @@ public abstract class Source {
     /** Chu kỳ làm mới khi màn hình đang sáng. */
     public abstract long intervalMs(Prefs prefs);
 
+    /** Khoảng cách tối thiểu giữa hai lần gọi (nguồn có giới hạn tần suất); 0 = không giới hạn. */
+    public long minGapMs(Prefs prefs) {
+        return 0;
+    }
+
     /** Dữ liệu cũ hơn mức này thì hiện nhãn "dữ liệu cũ". */
     public long staleMs(Prefs prefs) {
         return Math.max(3 * intervalMs(prefs), 30 * 60_000L);

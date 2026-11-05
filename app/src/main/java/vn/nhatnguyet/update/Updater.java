@@ -203,11 +203,14 @@ public final class Updater {
             //noinspection ResultOfMethodCallIgnored
             apk.delete();
             if (!tmp.renameTo(apk)) throw new java.io.IOException("không lưu được tệp");
-            // Trình cài đặt của Android < 7 đọc tệp qua đường dẫn: cho phép đọc.
-            //noinspection ResultOfMethodCallIgnored
-            apk.setReadable(true, false);
-            //noinspection ResultOfMethodCallIgnored
-            app.getFilesDir().setExecutable(true, false);
+            if (Build.VERSION.SDK_INT < 24) {
+                // Trình cài đặt của Android < 7 đọc tệp qua đường dẫn: cho phép đọc. Từ Android 7 cài qua
+                // PackageInstaller (truyền nội dung) nên giữ quyền tệp riêng tư.
+                //noinspection ResultOfMethodCallIgnored
+                apk.setReadable(true, false);
+                //noinspection ResultOfMethodCallIgnored
+                app.getFilesDir().setExecutable(true, false);
+            }
             readyCode = code;
             readyName = name;
             readyNotes = info.optString("notes", "");

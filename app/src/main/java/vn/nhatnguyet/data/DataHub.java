@@ -141,12 +141,36 @@ public final class DataHub {
 
     /** Tải lại ngay mọi nguồn (người dùng bấm dòng trạng thái). */
     public void refreshAll() {
-        for (Entry e : entries.values()) e.nextAt = FORCE;
+        if (!onMain()) {
+            main.post(new Runnable() {
+                @Override
+                public void run() {
+                    refreshAll();
+                }
+            });
+            return;
+        }
+        long now = System.currentTimeMillis();
+        for (Source s : sources.values()) {
+            Entry e = entries.get(s.key);
+            // Nguồn có giới hạn tần suất (vd. Vietcombank) không được ép tải sớm hơn.
+            if (e.data != null && now - e.at < s.minGapMs(prefs)) continue;
+            e.nextAt = FORCE;
+        }
         check();
     }
 
-    /** Gọi sau khi đổi cài đặt (thành phố, mã CK, RSS…). */
+    /** Gọi sau khi đổi cài đặt (thành phố, mã CK, RSS…). Gọi được từ luồng bất kỳ. */
     public void settingsChanged() {
+        if (!onMain()) {
+            main.post(new Runnable() {
+                @Override
+                public void run() {
+                    settingsChanged();
+                }
+            });
+            return;
+        }
         for (Source s : sources.values()) {
             Entry e = entries.get(s.key);
             String cfg = s.configKey(prefs);
@@ -162,6 +186,10 @@ public final class DataHub {
         check();
     }
 
+    private static boolean onMain() {
+        return Looper.myLooper() == Looper.getMainLooper();
+    }
+
     private void check() {
         long now = System.currentTimeMillis();
         for (final Source s : sources.values()) {
@@ -175,6 +203,11 @@ public final class DataHub {
             if (e.nextAt == 0 && e.data != null && e.error == null && now - e.at < s.intervalMs(prefs) && now >= e.at) {
                 // Dữ liệu từ bộ nhớ đệm còn mới: hẹn lần tải kế tiếp.
                 e.nextAt = e.at + s.intervalMs(prefs);
+            }
+            if (e.data != null && e.error == null && e.nextAt > 0) {
+                // Chu kỳ có thể ngắn lại (vd. chứng khoán vừa mở cửa): không chờ hết chu kỳ cũ.
+                long due = e.at + s.intervalMs(prefs);
+                if (e.nextAt > due) e.nextAt = Math.max(due, e.at + s.minGapMs(prefs));
             }
             if (now < e.nextAt) continue;
             load(s, e);
@@ -231,7 +264,7 @@ public final class DataHub {
             e.errorAt = now;
             e.fails++;
             long retry = Math.min(s.intervalMs(prefs), 60_000L * (1L << Math.min(e.fails - 1, 4)));
-            e.nextAt = now + Math.max(30_000L, retry);
+            e.nextAt = now + Math.max(Math.max(30_000L, s.minGapMs(prefs)), retry);
         }
         notifyChanged(s.key);
     }

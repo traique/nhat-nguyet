@@ -7,8 +7,10 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.net.URLEncoder;
+import java.util.Calendar;
 import java.util.Locale;
 
+import vn.nhatnguyet.Fmt;
 import vn.nhatnguyet.Prefs;
 import vn.nhatnguyet.net.Http;
 
@@ -65,12 +67,49 @@ public final class WeatherSource extends Source {
         return o;
     }
 
+    /** Mốc (ms) của chuỗi giờ "yyyy-MM-ddTHH:mm" theo giờ Việt Nam; 0 nếu không đọc được. */
+    static long epochOf(String ts) {
+        if (ts == null || ts.length() < 16) return 0;
+        try {
+            Calendar c = Calendar.getInstance(Fmt.vnTimeZone());
+            c.clear();
+            c.set(Integer.parseInt(ts.substring(0, 4)), Integer.parseInt(ts.substring(5, 7)) - 1,
+                    Integer.parseInt(ts.substring(8, 10)), Integer.parseInt(ts.substring(11, 13)),
+                    Integer.parseInt(ts.substring(14, 16)));
+            return c.getTimeInMillis();
+        } catch (RuntimeException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Chỉ số giờ dự báo đầu tiên còn ở phía trước, để dữ liệu cũ (mất mạng) vẫn hiện đúng giờ sắp tới.
+     * Trả về 1 với dữ liệu không có mốc; bằng số phần tử nếu mọi giờ đã qua.
+     */
+    public static int firstUpcomingHour(JSONObject w, long nowMs) {
+        JSONArray hours = w == null ? null : w.optJSONArray("hours");
+        if (hours == null) return 1;
+        boolean stamped = false;
+        for (int i = 0; i < hours.length(); i++) {
+            JSONObject h = hours.optJSONObject(i);
+            long ts = h == null ? 0 : h.optLong("ts");
+            if (ts > 0) stamped = true;
+            if (ts > nowMs) return i;
+        }
+        return stamped ? hours.length() : 1;
+    }
+
     /** "Sắp mưa khoảng 15h (80%)" nếu 3 giờ tới có mưa mà lúc này chưa mưa; null nếu không. */
     public static String rainSoon(JSONObject w) {
+        return rainSoon(w, System.currentTimeMillis());
+    }
+
+    static String rainSoon(JSONObject w, long nowMs) {
         JSONObject now = w.optJSONObject("now");
         JSONArray hours = w.optJSONArray("hours");
         if (now == null || hours == null || wet(now.optInt("code"))) return null;
-        for (int i = 1; i <= 3 && i < hours.length(); i++) {
+        int start = firstUpcomingHour(w, nowMs);
+        for (int i = start; i < start + 3 && i < hours.length(); i++) {
             JSONObject h = hours.optJSONObject(i);
             int code = h.optInt("code");
             int rain = h.optInt("rain");
@@ -114,6 +153,8 @@ public final class WeatherSource extends Source {
                 String ts = time.optString(i);
                 JSONObject o = new JSONObject();
                 o.put("h", ts.length() >= 13 ? ts.substring(11, 13) : ts);
+                long epoch = epochOf(ts);
+                if (epoch > 0) o.put("ts", epoch);
                 J.num(o, "t", t == null ? Double.NaN : t.optDouble(i));
                 o.put("code", code == null ? 0 : code.optInt(i));
                 o.put("rain", rain == null ? 0 : rain.optInt(i));

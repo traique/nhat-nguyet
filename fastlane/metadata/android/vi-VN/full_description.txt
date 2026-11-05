@@ -1,0 +1,14 @@
+Nhật Nguyệt biến một chiếc điện thoại Android, kể cả máy rất cũ, thành tấm lịch treo tường: đồng hồ cỡ lớn, lịch âm dương, thời tiết, giá vàng, xăng dầu, tỷ giá, chứng khoán và tin tức trên một màn hình nằm ngang.
+
+Không cần tài khoản, không quảng cáo, không qua máy chủ trung gian: ứng dụng lấy dữ liệu thẳng từ các nguồn công khai.
+
+• Bảng lịch tự co giãn theo màn hình 3,5 inch đến 6,7 inch.
+• Tờ lịch bloc: ngày dương thật lớn, ngày âm, can chi, giờ hoàng đạo, ca dao.
+• Lịch âm dương theo thuật toán Hồ Ngọc Đức: tháng nhuận, tiết khí, ngày lễ, đếm ngược Tết.
+• Ngày giỗ, sinh nhật theo âm hoặc dương lịch, nhắc trước 7 ngày.
+• Thời tiết theo giờ và 6 ngày, chất lượng không khí, báo sắp mưa (Open-Meteo).
+• Đồng hồ lật cỡ lớn.
+• Ngày sáng, đêm giảm sáng hoặc tắt màn; vẫy tay qua cảm biến để bật lại.
+• Chạy ngoại tuyến với dữ liệu gần nhất.
+
+Bản này không tự cập nhật. Bản cho Android 4.0.3 đến 6 có tại https://github.com/traique/nhat-nguyet/releases.

@@ -10,7 +10,7 @@ import java.util.Calendar;
 
 import vn.nhatnguyet.Prefs;
 
-/** Hẹn giờ bật màn hình lúc bắt đầu "giờ ngày" (vd. 6:00 sáng). */
+/** Hẹn giờ bật màn hình lúc bắt đầu "giờ ngày" (vd. 6:00 sáng). Chạy cho Android 10+ cần quyền "hiện trên ứng dụng khác". */
 public final class Scheduler {
     public static final String ACTION_MORNING = "vn.nhatnguyet.MORNING";
 
@@ -32,13 +32,13 @@ public final class Scheduler {
         c.set(Calendar.MILLISECOND, 0);
         if (c.getTimeInMillis() <= System.currentTimeMillis() + 1000) c.add(Calendar.DAY_OF_MONTH, 1);
         long at = c.getTimeInMillis();
+        // Bật màn buổi sáng không cần đúng tới giây: dùng báo thức thường (không cần quyền
+        // SCHEDULE_EXACT_ALARM/USE_EXACT_ALARM). Máy cắm sạc không vào Doze nên lệch tối đa vài phút.
         try {
-            if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) {
+            if (Build.VERSION.SDK_INT >= 23) {
                 am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi);
-            } else if (Build.VERSION.SDK_INT >= 23) {
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi);
             } else if (Build.VERSION.SDK_INT >= 19) {
-                am.setExact(AlarmManager.RTC_WAKEUP, at, pi);
+                am.setWindow(AlarmManager.RTC_WAKEUP, at, 10 * 60_000L, pi);
             } else {
                 am.set(AlarmManager.RTC_WAKEUP, at, pi);
             }

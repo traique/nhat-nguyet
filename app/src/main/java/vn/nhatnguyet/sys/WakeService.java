@@ -8,7 +8,9 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
+import android.content.BroadcastReceiver;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ServiceInfo;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -93,20 +95,50 @@ public class WakeService extends Service implements SensorEventListener {
         }
         cpuLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "nhatnguyet:proximity");
         cpuLock.setReferenceCounted(false);
-        cpuLock.acquire();
+        IntentFilter f = new IntentFilter(Intent.ACTION_SCREEN_ON);
+        f.addAction(Intent.ACTION_SCREEN_OFF);
+        registerReceiver(screenReceiver, f);
+        syncLock();
         sensors.registerListener(this, proximity, SensorManager.SENSOR_DELAY_NORMAL);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        syncLock();
         return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
         if (sensors != null) sensors.unregisterListener(this);
+        try {
+            unregisterReceiver(screenReceiver);
+        } catch (Throwable ignored) {
+        }
         if (cpuLock != null && cpuLock.isHeld()) cpuLock.release();
         super.onDestroy();
+    }
+
+    private final BroadcastReceiver screenReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            syncLock();
+        }
+    };
+
+    /**
+     * CPU chỉ cần thức khi màn đang tắt và có bật "vẫy tay để bật màn" (để nhận sự kiện cảm biến).
+     * Màn đang sáng thì CPU đã thức; chỉ bật "che để tắt" thì không cần giữ gì cả.
+     */
+    private void syncLock() {
+        if (cpuLock == null || power == null) return;
+        boolean want = prefs.proximityWake() && !Screen.isOn(power);
+        try {
+            if (want && !cpuLock.isHeld()) cpuLock.acquire();
+            else if (!want && cpuLock.isHeld()) cpuLock.release();
+        } catch (Throwable t) {
+            Log.w(TAG, "wakelock", t);
+        }
     }
 
     @Override
