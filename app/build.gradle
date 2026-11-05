@@ -135,6 +135,6 @@ dependencies {
     githubImplementation 'org.conscrypt:conscrypt-android:2.5.3'
     storeCompileOnly 'org.conscrypt:conscrypt-android:2.5.3'
     testImplementation 'junit:junit:4.13.2'
-    testImplementation 'org.json:json:20231013'
+    testImplementation 'org.json:json:20260814'
     testImplementation 'net.sf.kxml:kxml2:2.3.0'
 }
