@@ -1,5 +1,6 @@
 • Hỏi nơi ở ngay lần đầu mở; màn Cài đặt gọn hơn, có nhóm Nâng cao.
-• Sửa lỗi ngày giỗ ghi kèm năm, thêm mùng 2 và mùng 3 Tết, Giao thừa.
+• Thêm Ngày Văn hóa Việt Nam 24/11; thêm mùng 2, mùng 3 Tết, Giao thừa.
+• Sửa lỗi ngày giỗ ghi kèm năm.
 • Sửa lỗi có thể làm app đóng khi dùng "Dùng vị trí hiện tại".
 • Phím Back không còn thoát nhầm; nhắc cấp quyền tự bật lại trên Android 10+.
 • Bỏ quyền vị trí chính xác và báo thức chính xác.

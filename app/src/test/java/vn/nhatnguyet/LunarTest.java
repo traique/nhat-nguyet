@@ -111,8 +111,22 @@ public class LunarTest {
         assertEquals("Giao thừa", Lunar.holidayOn(16, 2, Lunar.solarToLunar(16, 2, 2026)).name);
         // Tháng Chạp Giáp Thìn thiếu (29 ngày): 29 Tết 28/1/2025 tính là Giao thừa.
         assertEquals("Giao thừa", Lunar.holidayOn(28, 1, Lunar.solarToLunar(28, 1, 2025)).name);
-        assertTrue(Lunar.isTet(Lunar.HOLIDAYS[11]));
+        assertTrue(Lunar.isTet(Lunar.holidayOn(18, 2, Lunar.solarToLunar(18, 2, 2026))));
         assertFalse(Lunar.isTet(Lunar.HOLIDAYS[0]));
+    }
+
+    @Test
+    public void vietnamCultureDayFrom2026() {
+        Lunar.Holiday h = Lunar.holidayOn(24, 11, Lunar.solarToLunar(24, 11, 2026));
+        assertEquals("Ngày Văn hóa Việt Nam", h.name);
+        assertTrue("ngày nghỉ hưởng lương như 30/4, 2/9", h.major);
+        assertEquals("Ngày Văn hóa Việt Nam", Lunar.holidayOn(24, 11, Lunar.solarToLunar(24, 11, 2030)).name);
+        // Trước khi có Nghị quyết 28/2026/QH16 thì không phải ngày lễ.
+        assertNull(Lunar.holidayOn(24, 11, Lunar.solarToLunar(24, 11, 2025)));
+        // Bảng lịch đếm ngược lễ lớn: từ 1/11/2026 thì lễ lớn kế tiếp là 24/11.
+        List<Lunar.Upcoming> up = Lunar.upcoming(1, 11, 2026, 1, true);
+        assertEquals("Ngày Văn hóa Việt Nam", up.get(0).holiday.name);
+        assertEquals(23, up.get(0).days);
     }
 
     @Test

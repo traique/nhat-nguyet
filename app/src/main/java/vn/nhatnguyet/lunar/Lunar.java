@@ -43,22 +43,30 @@ public final class Lunar {
         public final int month;
         public final boolean major;
         public final boolean personal;
+        /** Năm dương lịch bắt đầu có ngày lễ này (0 = từ trước tới nay). */
+        public final int sinceYear;
 
         Holiday(String name, boolean lunar, int day, int month, boolean major) {
-            this(name, lunar, day, month, major, false);
+            this(name, lunar, day, month, major, false, 0);
         }
 
-        private Holiday(String name, boolean lunar, int day, int month, boolean major, boolean personal) {
+        /** Ngày lễ mới được quy định: chỉ tính từ năm sinceYear. */
+        Holiday(String name, boolean lunar, int day, int month, boolean major, int sinceYear) {
+            this(name, lunar, day, month, major, false, sinceYear);
+        }
+
+        private Holiday(String name, boolean lunar, int day, int month, boolean major, boolean personal, int sinceYear) {
             this.name = name;
             this.lunar = lunar;
             this.day = day;
             this.month = month;
             this.major = major;
             this.personal = personal;
+            this.sinceYear = sinceYear;
         }
 
         public static Holiday personal(String name, boolean lunar, int day, int month) {
-            return new Holiday(name, lunar, day, month, true, true);
+            return new Holiday(name, lunar, day, month, true, true, 0);
         }
 
         /**
@@ -66,6 +74,7 @@ public final class Lunar {
          * Ngày dương 29/2 ở năm không nhuận tính là 28/2.
          */
         public boolean on(int dd, int mm, LunarDate ld) {
+            if (sinceYear > 0 && jdToDate(ld.jd)[2] < sinceYear) return false;
             if (!lunar) {
                 if (day == dd && month == mm) return true;
                 return day == 29 && month == 2 && dd == 28 && mm == 2 && !isLeapYear(jdToDate(ld.jd)[2]);
@@ -87,6 +96,9 @@ public final class Lunar {
             new Holiday("Quốc khánh", false, 2, 9, true),
             new Holiday("Phụ nữ Việt Nam", false, 20, 10, false),
             new Holiday("Nhà giáo Việt Nam", false, 20, 11, false),
+            // Nghị quyết 28/2026/QH16 (hiệu lực 1/7/2026): 24/11 hằng năm là Ngày Văn hóa Việt Nam,
+            // người lao động được nghỉ hưởng nguyên lương.
+            new Holiday("Ngày Văn hóa Việt Nam", false, 24, 11, true, 2026),
             new Holiday("Giáng sinh", false, 25, 12, false),
             new Holiday("Tết Nguyên đán", true, 1, 1, true),
             new Holiday("Mùng 2 Tết", true, 2, 1, true),

@@ -5,7 +5,7 @@
 - Lần đầu mở app hỏi nơi ở để thời tiết đúng chỗ ngay; màn Cài đặt gọn hơn, phần ít dùng gom vào "Nâng cao".
 - Trang Tin tức chọn báo bằng ô tick; mặc định chỉ bật Tờ lịch, Lịch tháng, Thời tiết, Vàng, Xăng dầu.
 - Thêm ngày giỗ bằng hộp thoại; nhận cả dòng ghi kèm năm ("15/8/2010 âm Giỗ ông") và "(âm)".
-- Mùng 2, mùng 3 Tết và Giao thừa là ngày lễ; ngày 29/2 dương lịch được nhắc vào 28/2 ở năm không nhuận.
+- Thêm Ngày Văn hóa Việt Nam 24/11 (ngày nghỉ hưởng lương từ năm 2026 theo Nghị quyết 28/2026/QH16), tô đỏ và đếm ngược như các ngày lễ lớn. Mùng 2, mùng 3 Tết và Giao thừa là ngày lễ; ngày 29/2 dương lịch được nhắc vào 28/2 ở năm không nhuận.
 - Sửa lỗi có thể làm app đóng khi bấm "Dùng vị trí hiện tại" rồi quay lại ngay.
 - Dãy giờ dự báo và dòng "Sắp mưa" tính theo giờ hiện tại kể cả khi mất mạng; chứng khoán tải ngay khi mở cửa.
 - Phím Back không thoát nhầm bảng lịch (bấm hai lần, hoặc Cài đặt > Nâng cao > Thoát); nhập sai PIN 5 lần phải chờ 30 giây.
