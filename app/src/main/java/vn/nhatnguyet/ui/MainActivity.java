@@ -898,14 +898,18 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         });
         col.add(clock, 0);
 
-        // Mỗi dữ kiện một dòng; thiếu chỗ thì ẩn dòng kém quan trọng (số ưu tiên lớn) trước.
+        // Ba khối: giờ và ngày dương; âm lịch và sự kiện; thời tiết. Mỗi dữ kiện một dòng, thiếu chỗ thì ẩn dòng
+        // kém quan trọng (số ưu tiên lớn) trước. Chế độ gọn (mặc định) bỏ những gì đã có ở trang bên phải.
+        boolean details = prefs.clockDetails();
         dateLine = line(19, false);
         col.add(dateLine, 0, ui.px(2));
         lunarLine = line(18, true);
-        col.add(lunarLine, 1, ui.px(6));
+        col.add(lunarLine, 1, ui.px(10));
         canChiLine = line(14, false);
+        canChiLine.setVisibility(details ? View.VISIBLE : View.GONE);
         col.add(canChiLine, 7, ui.px(4));
-        eventLine = line(14.5f, false);
+        eventLine = line(15, false);
+        eventLine.setVisibility(View.GONE);
         col.add(eventLine, 3, ui.px(4));
 
         LinearLayout wx = ui.row();
@@ -916,19 +920,20 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         wx.addView(tempText);
         descText = line(15, false);
         wx.addView(descText, Ui.weight(1));
-        col.add(wx, 2, ui.px(10));
+        col.add(wx, 2, ui.px(16));
 
-        alertLine = line(14, true);
+        detailText = line(14, false);
+        col.add(detailText, 5, ui.px(2));
+        alertLine = line(14.5f, true);
         alertLine.setVisibility(View.GONE);
         col.add(alertLine, 3, ui.px(4));
-        detailText = line(13.5f, false);
-        col.add(detailText, 5, ui.px(4));
-        airLine = line(13.5f, false);
+        airLine = line(14, false);
         airLine.setVisibility(View.GONE);
         col.add(airLine, 4, ui.px(3));
 
         hoursRow = ui.row();
         hoursCount = (int) clamp(widthPx / ui.pxf(78), 2, 6);
+        hoursRow.setVisibility(details ? View.VISIBLE : View.GONE);
         col.add(hoursRow, 6, ui.px(6));
 
         col.addFill(ui.spacer());
@@ -1320,7 +1325,9 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         String off = hol == null ? DaysOff.name(d, m, y) : null;
         // Ngày riêng (giỗ, sinh nhật) được nhắc trước một tuần, trước cả mùng 1, rằm.
         Lunar.Upcoming soon = hol == null && off == null ? Lunar.nextPersonal(d, m, y, 7) : null;
-        String[] ev;
+        // Chỉ hiện khi có điều đáng nói. Bản rút gọn (màn hẹp) phải giữ "hôm nay / mai / còn N ngày",
+        // nếu không người xem tưởng ngày lễ sắp tới là hôm nay.
+        String[] ev = null;
         int color = Theme.LUNAR;
         if (hol != null) {
             ev = new String[]{"Hôm nay: " + hol.name, hol.name};
@@ -1328,7 +1335,8 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             // Nghỉ bù, ngày nghỉ Tết, nghỉ hoán đổi theo lịch nhà nước.
             ev = new String[]{"Hôm nay: " + off, off};
         } else if (soon != null) {
-            ev = new String[]{(soon.days == 1 ? "Ngày mai: " : "Còn " + soon.days + " ngày: ") + soon.holiday.name, soon.holiday.name};
+            ev = countdown(soon);
+            color = Theme.TEXT;
         } else if (ld.day == 1 && !ld.leap) {
             ev = new String[]{"Mùng 1 tháng " + Lunar.MONTH_NAME[ld.month]};
         } else if (ld.day == 15) {
@@ -1340,20 +1348,30 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             List<Lunar.Upcoming> up = Lunar.upcoming(d, m, y, 1, true);
             int tet = Lunar.daysToTet(d, m, y);
             if (!up.isEmpty() && up.get(0).days <= 45) {
-                Lunar.Upcoming u = up.get(0);
-                String when = u.days == 1 ? "Ngày mai" : "Còn " + u.days + " ngày";
-                ev = new String[]{when + ": " + u.holiday.name, u.holiday.name};
+                ev = countdown(up.get(0));
                 color = Theme.TEXT;
             } else if (tet > 0 && tet <= 60) {
                 ev = new String[]{"Còn " + tet + " ngày đến Tết", "Tết: còn " + tet + " ngày"};
-            } else {
+                color = Theme.TEXT;
+            } else if (prefs.clockDetails()) {
                 boolean good = Lunar.isHoangDao(ld.jd, ld.month);
                 String kind = good ? "Ngày hoàng đạo" : "Ngày hắc đạo";
                 ev = new String[]{kind + " · tiết " + Lunar.solarTerm(ld.jd), kind};
                 color = good ? Theme.AUSPICIOUS : Theme.DIM;
             }
         }
-        eventLine.set(color, ev);
+        eventLine.setVisibility(ev == null ? View.GONE : View.VISIBLE);
+        if (ev != null) eventLine.set(color, ev);
+    }
+
+    /** "Còn 19 ngày: Ngày Văn hóa Việt Nam", rút dần nhưng luôn giữ khoảng cách ngày. */
+    static String[] countdown(Lunar.Upcoming u) {
+        String name = u.holiday.name;
+        String shortName = name.startsWith("Ngày ") ? name.substring(5) : name;
+        if (u.days == 1) return new String[]{"Ngày mai: " + name, "Mai: " + shortName, "Ngày mai có lễ"};
+        String date = Fmt.two(u.solar[0]) + "/" + Fmt.two(u.solar[1]);
+        return new String[]{"Còn " + u.days + " ngày: " + name, "Còn " + u.days + " ngày: " + shortName,
+                date + ": " + shortName, date + " · còn " + u.days + " ngày"};
     }
 
     private void renderWeather() {
@@ -1391,20 +1409,23 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             JSONObject t = days.optJSONObject(0);
             range = Fmt.range(t.optDouble("min"), t.optDouble("max"));
         }
+        boolean details = prefs.clockDetails();
         String feels = "cảm giác " + Fmt.temp(now.optDouble("feels"));
         double hum = now.optDouble("hum");
-        String humid = Double.isNaN(hum) ? "" : " · ẩm " + Math.round(hum) + "%";
+        String humid = details && !Double.isNaN(hum) ? " · ẩm " + Math.round(hum) + "%" : "";
         String head = range.length() > 0 ? range + " · " : "";
         detailText.set(Theme.DIM, head + feels + humid, head + feels, range.length() > 0 ? range : feels);
 
+        // Chế độ gọn: chỉ thêm một dòng cảnh báo khi đáng báo (sắp mưa, hoặc không khí từ mức "kém").
         String rain = WeatherSource.rainSoon(w);
         alertLine.setVisibility(rain == null ? View.GONE : View.VISIBLE);
         if (rain != null) {
             alertLine.set(rain.startsWith("Sắp có dông") ? Theme.WARN : Theme.RAIN, rain, rain.replaceFirst(" \\(.*\\)$", ""));
         }
         JSONObject air = w.optJSONObject("air");
-        airLine.setVisibility(air == null ? View.GONE : View.VISIBLE);
-        if (air != null) {
+        boolean showAir = air != null && (details || (rain == null && WeatherCodes.aqiLevel(air.optInt("aqi")) >= 2));
+        airLine.setVisibility(showAir ? View.VISIBLE : View.GONE);
+        if (showAir) {
             int aqi = air.optInt("aqi");
             int level = WeatherCodes.aqiLevel(aqi);
             String label = WeatherCodes.AQI_LABEL[level];
@@ -1415,7 +1436,7 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
         }
 
         JSONArray hours = w.optJSONArray("hours");
-        if (hours != null) {
+        if (hours != null && details) {
             int start = WeatherSource.firstUpcomingHour(w, System.currentTimeMillis());
             for (int i = start; i < start + hoursCount && i < hours.length(); i++) {
                 JSONObject h = hours.optJSONObject(i);
@@ -1485,8 +1506,13 @@ public class MainActivity extends Activity implements DataHub.Listener, Updater.
             statusText.set(Theme.META, place);
             return;
         }
+        // Chỉ nói giờ cập nhật khi dữ liệu đã cũ; bình thường thì dòng này chỉ ghi nơi ở cho đỡ rối.
         long now = System.currentTimeMillis();
-        String fresh = now - e.at < 60_000L ? "vừa cập nhật" : "cập nhật " + Fmt.agoPhrase(e.at, now);
+        if (now - e.at < 45 * 60_000L) {
+            statusText.set(Theme.META, place);
+            return;
+        }
+        String fresh = "cập nhật " + Fmt.agoPhrase(e.at, now);
         statusText.set(Theme.META, place + " · " + fresh, fresh);
     }
 

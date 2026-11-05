@@ -37,7 +37,7 @@ Không cần tài khoản, không quảng cáo, không qua máy chủ trung gian
 
 ## Tính năng
 
-- **Bảng lịch tự co giãn.** Cột trái luôn hiện giờ, thứ ngày, âm lịch, can chi, ngày lễ, thời tiết hiện tại và pin. Mỗi dữ kiện nằm gọn một dòng; màn nhỏ tự ẩn dòng kém quan trọng thay vì thu chữ.
+- **Bảng lịch tự co giãn, cột giờ gọn.** Cột trái chia ba khối: giờ và ngày dương; âm lịch và một dòng sự kiện khi đáng nói (ngày lễ, ngày nghỉ, giỗ sắp tới, mùng 1, rằm, đếm ngược lễ lớn); thời tiết hai dòng, thêm một dòng khi sắp mưa hoặc không khí kém. Can chi, độ ẩm, dự báo theo giờ đã có ở trang Tờ lịch và Thời tiết; muốn hiện cả dưới đồng hồ thì bật trong Cài đặt > Nâng cao. Màn nhỏ tự ẩn dòng kém quan trọng thay vì thu chữ.
 - **Tờ lịch.** Ngày dương thật lớn, ngày âm màu đỏ son, can chi, giờ hoàng đạo và một câu ca dao mỗi ngày, như tờ lịch bloc treo tường.
 - **Lịch âm dương chính xác.** Thuật toán Hồ Ngọc Đức theo múi giờ +7: tháng nhuận, can chi ngày tháng năm, tiết khí, ngày và giờ hoàng đạo, ngày lễ (gồm Ngày Văn hóa Việt Nam 24/11 từ năm 2026), đếm ngược Tết.
 - **Ngày nghỉ đúng luật.** Chỉ tô đỏ ngày được nghỉ hưởng lương theo Bộ luật Lao động 2019 (Điều 112) và Nghị quyết 28/2026/QH16, cùng ngày nghỉ bù khi lễ trùng cuối tuần (khoản 3 Điều 111). Ngày nghỉ Tết, ngày liền kề Quốc khánh và ngày hoán đổi theo lịch khối nhà nước đã công bố (hiện có 2026 và 2027); năm chưa công bố chỉ đánh dấu những ngày chắc chắn nghỉ. Ngày kỷ niệm không được nghỉ chỉ ghi tên.

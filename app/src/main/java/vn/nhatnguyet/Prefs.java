@@ -268,6 +268,11 @@ public final class Prefs {
         return DISPLAY_FLIP.equals(displayMode());
     }
 
+    /** Cột giờ hiện thêm chi tiết: can chi, ngày hoàng đạo, độ ẩm, không khí, dự báo theo giờ (mặc định gọn). */
+    public boolean clockDetails() {
+        return sp.getBoolean("clock_details", false);
+    }
+
     /** Hiện ngày, âm lịch, thời tiết dưới đồng hồ lật. */
     public boolean flipInfo() {
         return sp.getBoolean("flip_info", true);

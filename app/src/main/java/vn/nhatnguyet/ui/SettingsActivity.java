@@ -88,7 +88,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
     private TextView placeState, personalState, updateState, versionText, versionDetail;
     private Button installButton, pinButton, pinRemove;
     private CheckBox alwaysOn, burnIn, warmNight, proximity, proximitySleep, wakeMorning, autoStart, autoUpdate, flipInfo;
-    private CheckBox awayEnabled, awayWeekdays, batterySaver;
+    private CheckBox awayEnabled, awayWeekdays, batterySaver, clockDetails;
     private Slider awayStart, awayEnd;
     private LinearLayout awayBox;
     private TextView batteryState;
@@ -459,6 +459,8 @@ public class SettingsActivity extends Activity implements Updater.Listener {
 
         label(box, "Bố cục");
         layoutGroup = radios(box, 100, new String[]{"Tự động theo kích thước máy", "Luôn 2 cột", "3 cột (máy màn dài từ 6 inch)"});
+        clockDetails = check(box, "Dưới đồng hồ hiện thêm chi tiết: can chi, ngày hoàng đạo, độ ẩm, không khí, dự báo theo giờ");
+        note(box, "Mặc định cột đồng hồ chỉ giữ giờ, ngày, âm lịch, ngày lễ sắp tới và thời tiết; phần chi tiết đã có ở trang Tờ lịch và Thời tiết.");
 
         label(box, "Chứng khoán: mã theo dõi, cách nhau dấu phẩy");
         watchlist = input(box, Prefs.DEFAULT_WATCHLIST, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
@@ -786,6 +788,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         awayEnd.set(prefs.awayEnd());
         awayWeekdays.setChecked(prefs.awayWeekdaysOnly());
         batterySaver.setChecked(prefs.batterySaver());
+        clockDetails.setChecked(prefs.clockDetails());
         autoStart.setChecked(prefs.autoStart());
         if (autoUpdate != null) autoUpdate.setChecked(prefs.autoUpdate());
     }
@@ -864,6 +867,7 @@ public class SettingsActivity extends Activity implements Updater.Listener {
         prefs.putInt("away_end", awayEnd.get());
         prefs.putBool("away_weekdays", awayWeekdays.isChecked());
         prefs.putBool("battery_saver", batterySaver.isChecked());
+        prefs.putBool("clock_details", clockDetails.isChecked());
         if (autoUpdate != null) prefs.putBool("auto_update", autoUpdate.isChecked());
 
         if (!place.getText().toString().trim().equalsIgnoreCase(prefs.placeName())

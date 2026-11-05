@@ -3,6 +3,8 @@
 ## 1.0.2
 
 - Lần đầu mở app hỏi nơi ở để thời tiết đúng chỗ ngay; màn Cài đặt gọn hơn, phần ít dùng gom vào "Nâng cao".
+- Cột đồng hồ gọn hơn: ba khối giờ, âm lịch, thời tiết; bỏ dòng can chi, "ngày hoàng đạo", độ ẩm, dự báo theo giờ và "vừa cập nhật" (đã có ở trang bên phải; bật lại trong Nâng cao). Không khí chỉ hiện khi từ mức kém.
+- Sửa dòng đếm ngược trên màn hẹp bị rút thành tên ngày lễ, dễ tưởng là hôm nay; giờ luôn giữ "còn N ngày" hoặc ngày dương.
 - Trang Tin tức chọn báo bằng ô tick; mặc định chỉ bật Tờ lịch, Lịch tháng, Thời tiết, Vàng, Xăng dầu.
 - Thêm ngày giỗ bằng hộp thoại; nhận cả dòng ghi kèm năm ("15/8/2010 âm Giỗ ông") và "(âm)".
 - Thêm Ngày Văn hóa Việt Nam 24/11 (ngày nghỉ hưởng lương từ năm 2026 theo Nghị quyết 28/2026/QH16), tô đỏ và đếm ngược như các ngày lễ lớn. Mùng 2, mùng 3 Tết và Giao thừa là ngày lễ; ngày 29/2 dương lịch được nhắc vào 28/2 ở năm không nhuận.
