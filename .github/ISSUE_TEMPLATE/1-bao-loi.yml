@@ -1,0 +1,53 @@
+name: Báo lỗi
+description: Ứng dụng chạy sai, treo, đóng đột ngột hoặc hiện sai số liệu (thời tiết, giá vàng, xăng dầu, tỷ giá...)
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Cảm ơn bạn. Lỗi về ngày âm, ngày lễ hay ngày nghỉ xin dùng mẫu **Sai lịch hoặc ngày nghỉ**.
+  - type: input
+    id: may
+    attributes:
+      label: Máy và phiên bản Android
+      placeholder: "Samsung Galaxy S3, Android 4.3"
+    validations:
+      required: true
+  - type: input
+    id: phien-ban
+    attributes:
+      label: Phiên bản Nhật Nguyệt
+      description: Xem ở Cài đặt > Giới thiệu.
+      placeholder: "1.0.2"
+    validations:
+      required: true
+  - type: dropdown
+    id: ban
+    attributes:
+      label: Bản đang cài
+      options:
+        - Tải từ GitHub (NhatNguyet-x.y.z.apk, tự cập nhật)
+        - Bản cửa hàng (-store, Google Play hoặc F-Droid)
+        - Tự build từ mã nguồn
+        - Không rõ
+    validations:
+      required: true
+  - type: textarea
+    id: chuyen-gi
+    attributes:
+      label: Chuyện gì xảy ra
+      description: Đang ở trang nào, dòng trạng thái báo gì, xảy ra lúc mấy giờ.
+    validations:
+      required: true
+  - type: textarea
+    id: lam-lai
+    attributes:
+      label: Cách làm lại lỗi
+      placeholder: |
+        1. Mở Cài đặt > ...
+        2. Bấm ...
+  - type: textarea
+    id: anh
+    attributes:
+      label: Ảnh chụp màn hình
+      description: Kéo thả ảnh vào đây nếu có.

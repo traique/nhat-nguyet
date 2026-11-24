@@ -1,0 +1,59 @@
+name: Sai lịch hoặc ngày nghỉ
+description: Ngày âm, can chi, tiết khí, giờ hoàng đạo, ngày lễ, ngày nghỉ hay ngày giỗ khác với lịch in hoặc văn bản nhà nước
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Báo kèm **nguồn** thì kiểm và sửa được nhanh: tờ lịch in (ảnh chụp), văn bản của Bộ Nội vụ hay Chính phủ (số hiệu), hoặc trang chính thức.
+        Lịch nghỉ trong app theo khối cơ quan nhà nước; doanh nghiệp có thể chọn phương án nghỉ khác.
+  - type: input
+    id: ngay
+    attributes:
+      label: Ngày dương lịch bị sai
+      placeholder: "24/11/2026"
+    validations:
+      required: true
+  - type: dropdown
+    id: muc
+    attributes:
+      label: Mục bị sai
+      multiple: true
+      options:
+        - Ngày âm, tháng nhuận
+        - Can chi, nạp âm, Nhị thập bát tú
+        - Tiết khí
+        - Ngày, giờ hoàng đạo
+        - Tên ngày lễ
+        - Ngày nghỉ, nghỉ bù, nghỉ Tết, làm bù (tô đỏ sai)
+        - Ngày giỗ, sinh nhật tự thêm
+        - Đếm ngược, dòng nhắc sự kiện
+    validations:
+      required: true
+  - type: textarea
+    id: app-hien
+    attributes:
+      label: App đang hiện
+      placeholder: "Trang Âm lịch ghi: Ngày Giáp Tý, tháng ..."
+    validations:
+      required: true
+  - type: textarea
+    id: dung-ra
+    attributes:
+      label: Đúng ra phải là
+    validations:
+      required: true
+  - type: textarea
+    id: nguon
+    attributes:
+      label: Nguồn
+      description: Ảnh tờ lịch in, số hiệu văn bản hoặc đường dẫn.
+      placeholder: "Thông báo 9441/TB-BNV ngày ... của Bộ Nội vụ"
+    validations:
+      required: true
+  - type: input
+    id: phien-ban
+    attributes:
+      label: Phiên bản Nhật Nguyệt
+      description: Xem ở Cài đặt > Giới thiệu.
+      placeholder: "1.0.2"

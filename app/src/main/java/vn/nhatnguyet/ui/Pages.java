@@ -250,6 +250,15 @@ final class Pages {
         cc.set(Theme.TEXT, day + " · tháng " + Lunar.monthCanChi(ld.month, ld.year), day);
         col.add(cc, 1, ui.px(8));
 
+        // Nạp âm và Nhị Thập Bát Tú của ngày: chỉ ghi tên, không gắn tốt xấu (các sách không thống nhất).
+        // Ẩn trước giờ tốt, tiết khí và ngày lễ gần nhất khi thiếu chỗ.
+        String nap = Lunar.dayNapAm(jd);
+        String tu = Lunar.dayMansion(jd);
+        FitLine na = line(BODY, false);
+        na.set(Theme.DIM, "Nạp âm " + nap + " · Nhị thập bát tú: " + tu, nap + " · Nhị thập bát tú: " + tu,
+                nap + " · sao " + tu, nap);
+        col.add(na, 6, ui.px(4));
+
         String star = "sao " + Lunar.STARS[Lunar.dayStar(jd, ld.month)];
         boolean good = Lunar.isHoangDao(jd, ld.month);
         String kind = good ? "Ngày hoàng đạo" : "Ngày hắc đạo";
