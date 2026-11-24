@@ -319,6 +319,52 @@ public final class Lunar {
         return mod(jd + 1, 12);
     }
 
+    // ---------------------------------------------------------------- nạp âm, nhị thập bát tú
+
+    /**
+     * Nạp âm Lục thập hoa giáp: mỗi cặp can chi liền nhau chung một mục (Giáp Tý, Ất Sửu là Hải Trung Kim).
+     * Nhâm Dần, Quý Mão (金箔金) ghi "Kim Bạch Kim" như lịch phổ thông; đọc theo chữ Hán là "Kim Bạc Kim".
+     */
+    public static final String[] NAP_AM = {
+            "Hải Trung Kim", "Lư Trung Hỏa", "Đại Lâm Mộc", "Lộ Bàng Thổ", "Kiếm Phong Kim",
+            "Sơn Đầu Hỏa", "Giản Hạ Thủy", "Thành Đầu Thổ", "Bạch Lạp Kim", "Dương Liễu Mộc",
+            "Tuyền Trung Thủy", "Ốc Thượng Thổ", "Tích Lịch Hỏa", "Tùng Bách Mộc", "Trường Lưu Thủy",
+            "Sa Trung Kim", "Sơn Hạ Hỏa", "Bình Địa Mộc", "Bích Thượng Thổ", "Kim Bạch Kim",
+            "Phú Đăng Hỏa", "Thiên Hà Thủy", "Đại Trạch Thổ", "Thoa Xuyến Kim", "Tang Đố Mộc",
+            "Đại Khê Thủy", "Sa Trung Thổ", "Thiên Thượng Hỏa", "Thạch Lựu Mộc", "Đại Hải Thủy"};
+
+    /** Nhị Thập Bát Tú theo thứ tự vòng, bắt đầu từ Giác (Thanh Long phương Đông). */
+    public static final String[] MANSIONS = {
+            "Giác", "Cang", "Đê", "Phòng", "Tâm", "Vĩ", "Cơ",
+            "Đẩu", "Ngưu", "Nữ", "Hư", "Nguy", "Thất", "Bích",
+            "Khuê", "Lâu", "Vị", "Mão", "Tất", "Chủy", "Sâm",
+            "Tỉnh", "Quỷ", "Liễu", "Tinh", "Trương", "Dực", "Chẩn"};
+
+    /**
+     * Mốc vòng 28 sao: thứ Hai 21/9/2026 là sao Tâm (vị trí 4). Vòng khoá với tuần lễ (28 chia hết cho 7),
+     * nên sao nào cũng luôn rơi vào cùng một thứ, vd Tâm luôn là thứ Hai.
+     */
+    private static final int MANSION_EPOCH_JD = jdFromDate(21, 9, 2026);
+    private static final int MANSION_EPOCH_INDEX = 4;
+
+    /** Vị trí can chi của ngày trong vòng 60 (0 là Giáp Tý). */
+    public static int dayCycle(int jd) {
+        return mod(jd + 49, 60);
+    }
+
+    /** Nạp âm của ngày, vd "Hải Trung Kim". */
+    public static String dayNapAm(int jd) {
+        return NAP_AM[dayCycle(jd) / 2];
+    }
+
+    /**
+     * Sao Nhị Thập Bát Tú của ngày, vd "Tâm". Chỉ ghi tên: các sách xếp tốt xấu của từng sao
+     * không thống nhất nên app không gắn nhãn tốt xấu.
+     */
+    public static String dayMansion(int jd) {
+        return MANSIONS[mod(jd - MANSION_EPOCH_JD + MANSION_EPOCH_INDEX, 28)];
+    }
+
     // ---------------------------------------------------------------- tiết khí
 
     /** Chỉ số tiết khí (0..23) đang hiệu lực trong ngày jd. */

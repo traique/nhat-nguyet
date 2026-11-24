@@ -1,0 +1,31 @@
+name: Đề xuất
+description: Góp ý tính năng hoặc cách hiển thị
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: muon-gi
+    attributes:
+      label: Bạn muốn gì
+    validations:
+      required: true
+  - type: textarea
+    id: vi-sao
+    attributes:
+      label: Vì sao cần
+      description: Dùng trên máy nào, màn hình mấy inch, treo ở đâu, ai xem.
+    validations:
+      required: true
+  - type: dropdown
+    id: phan
+    attributes:
+      label: Liên quan tới phần nào
+      multiple: true
+      options:
+        - Cột đồng hồ, đồng hồ lật
+        - Tờ lịch, âm lịch, lịch tháng
+        - Thời tiết, không khí
+        - Giá vàng, xăng dầu, tỷ giá, chứng khoán
+        - Tin tức
+        - Ngày và đêm, tiết kiệm pin, tự bật lại
+        - Cài đặt
+        - Khác

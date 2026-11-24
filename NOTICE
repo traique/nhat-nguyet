@@ -30,6 +30,13 @@ Open-Meteo (CC BY 4.0, https://open-meteo.com), OpenStreetMap Nominatim (dữ li
 © OpenStreetMap contributors), vang.today, giaxanghomnay.com, Vietcombank, DNSE/Entrade,
 và các nguồn RSS do người dùng chọn.
 
+Dữ liệu kiểm thử (chỉ có trong mã nguồn, không đóng gói trong ứng dụng): thư mục
+app/src/test/resources/doi-chieu/ chứa ca kiểm âm lịch và mốc tiết khí lấy từ
+https://github.com/Nhat-Nguyet/nhatnguyet-lunar-ziwei-bazi-numerology.
+Dữ liệu: Nhat Nguyet (nhatnguyet.org), giấy phép CC BY 4.0
+(https://creativecommons.org/licenses/by/4.0/); mốc tiết khí nội suy từ lịch thiên văn IMCCE.
+Đã rút gọn và đổi định dạng, chi tiết trong README.md của thư mục đó.
+
 =======================================================================
 NOTICE của Conscrypt
 =======================================================================

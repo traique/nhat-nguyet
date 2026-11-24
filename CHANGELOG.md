@@ -1,5 +1,11 @@
 # Nhật ký thay đổi
 
+## Chưa phát hành
+
+- Trang Âm lịch ghi thêm nạp âm của ngày (vd. Hải Trung Kim) và sao Nhị thập bát tú; chỉ ghi tên, không gắn tốt xấu vì các sách không thống nhất.
+- Kiểm thử âm lịch với dữ liệu độc lập 1900–2100: gần 9.000 ca đổi lịch của bộ ca kiểm Nhat Nguyet (CC BY 4.0) và 4.824 mốc tiết khí IMCCE.
+- Mẫu báo lỗi trên GitHub thành form điền sẵn, thêm mẫu "Sai lịch hoặc ngày nghỉ" và mẫu pull request.
+
 ## 1.0.2
 
 - Lần đầu mở app hỏi nơi ở để thời tiết đúng chỗ ngay; màn Cài đặt gọn hơn, phần ít dùng gom vào "Nâng cao".
