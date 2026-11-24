@@ -1,6 +1,6 @@
 # Nhật ký thay đổi
 
-## Chưa phát hành
+## 1.0.3
 
 - Trang Âm lịch ghi thêm nạp âm của ngày (vd. Hải Trung Kim) và sao Nhị thập bát tú; chỉ ghi tên, không gắn tốt xấu vì các sách không thống nhất.
 - Kiểm thử âm lịch với dữ liệu độc lập 1900–2100: gần 9.000 ca đổi lịch của bộ ca kiểm Nhat Nguyet (CC BY 4.0) và 4.824 mốc tiết khí IMCCE.

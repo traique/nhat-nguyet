@@ -18,7 +18,7 @@ body:
     attributes:
       label: Phiên bản Nhật Nguyệt
       description: Xem ở Cài đặt > Giới thiệu.
-      placeholder: "1.0.2"
+      placeholder: "1.0.3"
     validations:
       required: true
   - type: dropdown
