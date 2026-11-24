@@ -5,7 +5,7 @@ plugins {
 // Phiên bản ghi cố định ở đây (F-Droid và người build từ mã nguồn đọc được). CI kiểm tra tag vX.Y.Z phải
 // khớp; bản thử trên nhánh có thể ghi đè bằng biến môi trường VERSION_NAME (vd. 0.0.123).
 // versionCode = X*10000 + Y*100 + Z, luôn tăng khi tăng phiên bản.
-def APP_VERSION = '1.0.2'
+def APP_VERSION = '1.0.3'
 def verName = (System.getenv('VERSION_NAME') ?: (project.findProperty('versionName') ?: APP_VERSION)).toString()
 def verParts = verName.tokenize('.-')
 def verCode = 0
